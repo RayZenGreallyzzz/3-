@@ -7,3 +7,25 @@
 @media(max-width:880px){.workspace{grid-template-columns:minmax(0,1fr) 312px}.panel{padding:13px}.sidebar-heading{padding:14px}.topbar{height:59px;padding:0 12px}.brand strong{font-size:13px}.brand-icon{width:34px;height:34px}.transport{padding:10px}.speed{font-size:9px}}
 @media(max-width:650px){#app{overflow:auto;min-height:100dvh;height:auto}.workspace{display:flex;flex-direction:column}.viewport-col{height:62dvh;min-height:370px;flex:none}#viewport{min-height:240px}.transport{padding:10px}.transport-top{gap:6px}.transport-top select{max-width:140px}.sidebar{overflow:visible;border-left:0;border-top:1px solid #34405d}.panel{padding:17px 20px}.bone-list{max-height:180px}.import-button{min-height:86px}.top-actions #model-badge{display:none}.speed{gap:3px}.speed select{width:58px}.btn.icon{width:30px;min-height:30px}.view-tools{right:10px;top:10px}#empty-state{top:45%}}
 @media(max-width:390px){.start-content h1{font-size:29px}.start-logo-wrap{width:112px;height:112px}.start-description{font-size:12px}.speed{font-size:0}.transport-top select{min-width:80px;max-width:125px}.brand small{letter-spacing:1px}}
+
+/* Original neon animal mascot brand (art supplied by the project owner). */
+.start-content{max-width:480px;padding:8px 12px 17px;background:linear-gradient(180deg,#19163065,#15152a40);border:1px solid #6355b32b;border-radius:24px;box-shadow:0 22px 100px #0005;backdrop-filter:blur(6px)}
+.start-art-wrap{display:flex;align-items:center;justify-content:center;height:clamp(190px,37vh,350px);margin:-1px auto 12px;position:relative}
+.start-art-wrap::after{content:"";position:absolute;left:15%;right:15%;bottom:8px;height:22px;background:#ac36f066;filter:blur(26px);border-radius:50%;z-index:-1}
+.start-art{display:block;max-width:100%;width:auto;max-height:100%;object-fit:contain;filter:drop-shadow(0 14px 24px #4f168a55) drop-shadow(0 0 14px #02cbdf25);animation:mascot-float 5s ease-in-out infinite}
+.start-overline{margin-top:4px;color:#65e5ff}
+.start-content h1{font-size:clamp(27px,6vw,41px);text-shadow:0 0 24px #8d52fa30}
+.start-description{margin:13px auto 7px}
+.start-buttons{gap:9px}
+.start-buttons button{min-height:49px;font-size:13px;border-radius:13px}
+.start-buttons button:nth-child(2){border-color:#2f9fcc;color:#c5faff;background:linear-gradient(115deg,#144263,#31245a)}
+.start-features{gap:6px}
+.start-features span{font-size:9px;padding:7px 9px}
+.start-divider{margin:14px 0 11px}
+.start-bottom{margin-top:16px}
+.brand-icon{overflow:hidden;padding:2px}
+.brand-icon img{width:100%;height:100%;object-fit:cover;border-radius:9px}
+@keyframes mascot-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@media(max-width:650px){#start-screen{padding:12px 11px}.start-content{padding:15px 13px}.start-art-wrap{height:clamp(175px,33vh,300px);margin:0 auto 8px}.start-content h1{font-size:clamp(27px,7.5vw,36px)}.start-description{margin:11px auto 7px;font-size:11px}.start-overline{font-size:9px}.start-buttons button{min-height:45px;font-size:12px}.start-divider{margin:12px 0 8px}.start-features span{font-size:8px;padding:6px 8px}.start-bottom{margin-top:13px}}
+@media(max-height:640px){.start-art-wrap{height:30vh;min-height:125px}.start-content{padding:10px}.start-content h1{font-size:26px}.start-description{margin:8px auto}.start-buttons button{min-height:38px}.start-bottom{margin-top:8px}}
+@media(prefers-reduced-motion:reduce){.start-art{animation:none}}

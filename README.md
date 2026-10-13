@@ -39,3 +39,6 @@ npm run dev
 - `public/logo.svg` — временное оформление. Оригинальную иконку можно добавить в проект отдельным изображением.
 
 Стек: Vite + Three.js + Capacitor 7. Лицензия MIT.
+
+## Фирменный маскот
+В приложении установлено оригинальное изображение маскота (изображение, предоставленное владельцем проекта): `public/panda-menu.webp` для стартового меню, `public/panda-icon.png` для интерфейса и `branding/android/panda-icon.png` как launcher icon Android. Обновлённый логотип встроен в APK при каждой сборке GitHub Actions.

@@ -399,10 +399,10 @@ const splash=document.createElement('div'); splash.id='start-screen';
 splash.innerHTML=`
   <div class="start-orb orb-a"></div><div class="start-orb orb-b"></div>
   <div class="start-content">
-    <div class="start-logo-wrap"><img class="start-logo" src="/logo.svg" alt="Логотип Rig & Weapon Studio"/></div>
     <div class="start-overline">3D CHARACTER WORKSHOP</div>
     <h1>RIG <span>& WEAPON</span><br/>STUDIO</h1>
     <p class="start-description">Твоя 3D-мастерская. Загружай персонажей, просматривай анимации и настраивай оружие до идеального положения.</p>
+    <div class="start-art-wrap"><img class="start-art" src="/panda-menu.webp" alt="Неоновый талисман приложения — сердитый зверёк в кепке"/></div>
     <div class="start-buttons"><button class="btn primary" id="start-character"><span class="btn-ico">◈</span> Загрузить персонажа <span>→</span></button>
     <button class="btn subtle" id="start-weapon"><span class="btn-ico">⚔</span> Загрузить оружие <span>→</span></button>
     <button class="btn subtle" id="start-demo"><span class="btn-ico">◉</span> Открыть пустую сцену <span>→</span></button></div>
@@ -412,7 +412,7 @@ splash.innerHTML=`
   </div>`;
 document.body.append(splash);
 const loader=document.createElement('div'); loader.id='loading-layer'; loader.className='loading-layer hidden';
-loader.innerHTML=`<div class="loading-card"><img src="/logo.svg" alt="Логотип" /><h2>Загружаем 3D-модель</h2><p id="loading-file">Подготовка сцены</p><div class="loading-track"><div class="loading-bar"></div></div></div>`;
+loader.innerHTML=`<div class="loading-card"><img src="/panda-icon.png" alt="Иконка приложения" /><h2>Загружаем 3D-модель</h2><p id="loading-file">Подготовка сцены</p><div class="loading-track"><div class="loading-bar"></div></div></div>`;
 document.body.append(loader);
 
 button('start-character',()=> $('file-character').click());

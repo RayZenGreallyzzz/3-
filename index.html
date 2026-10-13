@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/><meta name="theme-color" content="#111625"/><title>Rig & Weapon Studio</title></head><body>
+<html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/><meta name="theme-color" content="#111625"/><link rel="icon" type="image/png" href="/panda-icon.png"/><title>Rig & Weapon Studio</title></head><body>
 <div id="app">
-<header class="topbar"><div class="brand"><span class="brand-icon">◆</span><div><strong>RIG <em>&</em> WEAPON</strong><small>3D STUDIO · v0.1</small></div></div><div class="top-actions"><span id="model-badge">Сцена пуста</span><button id="reset-camera" class="btn subtle">⌖ Камера</button></div></header>
+<header class="topbar"><div class="brand"><span class="brand-icon"><img src="/panda-icon.png" alt="Иконка"/></span><div><strong>RIG <em>&</em> WEAPON</strong><small>3D STUDIO · v0.1</small></div></div><div class="top-actions"><span id="model-badge">Сцена пуста</span><button id="reset-camera" class="btn subtle">⌖ Камера</button></div></header>
 <div class="workspace">
  <div class="viewport-col">
   <div id="viewport" aria-label="Область просмотра 3D-моделей"><div id="empty-state"><div class="empty-graphic">⬡</div><h2>Загрузи персонажа</h2><p>GLB · GLTF · FBX · OBJ · DAE · STL · PLY</p><button class="btn primary" id="empty-load">＋ Выбрать модель</button><p class="hint">Перетяни файлы сюда или выбери из памяти телефона</p></div><div class="viewport-status"><span id="fps-label">Сцена готова</span><span id="view-mode">Perspective</span></div><div class="view-tools"><button id="grid-toggle" title="Сетка" class="tool active">▦</button><button id="bone-toggle" title="Скелет" class="tool">♧</button><button id="frame-camera" title="Вписать в кадр" class="tool">⛶</button></div></div>

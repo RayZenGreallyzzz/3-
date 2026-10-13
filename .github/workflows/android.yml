@@ -28,6 +28,8 @@ jobs:
         run: |
           mkdir -p android/app/src/main/res/drawable
           mkdir -p android/app/src/main/res/mipmap-anydpi-v26
+          mkdir -p android/app/src/main/res/drawable-nodpi
+          cp branding/android/panda-icon.png android/app/src/main/res/drawable-nodpi/panda_icon.png
           cp branding/android/rig_launcher_foreground.xml android/app/src/main/res/drawable/rig_launcher_foreground.xml
           cp branding/android/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           cp branding/android/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
