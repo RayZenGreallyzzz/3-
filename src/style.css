@@ -36,3 +36,15 @@
 .model-reset-button:enabled:hover{background:#44283d;border-color:#ef8dba;color:#fff}
 .model-reset-button:disabled{color:#617086;border-color:#30384c;background:#151c2b;opacity:.7}
 @media(max-width:370px){.model-reset-actions{gap:6px}.model-reset-button{font-size:9px;padding:8px 3px}}
+
+/* v0.2: clean preview and landscape/full-window editing. */
+.gizmo-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.gizmo-button{border-color:#536daa;background:#202e4e;white-space:nowrap;padding:8px 11px;font-size:11px;min-height:36px}
+.gizmo-button:disabled{opacity:.45}
+#gizmo-hint{color:#8d9eb7;font-size:10px}
+.export-glb-btn{width:100%;font-size:12px;min-height:42px;background:linear-gradient(105deg,#5c68d3,#7c5dc9,#4493bb)}
+.export-panel{border-top:1px solid #344362}
+#app.viewer-wide .workspace{grid-template-columns:minmax(0,1fr)!important}
+#app.viewer-wide .sidebar{display:none!important}
+#app.viewer-wide .viewport-col{height:100%;min-height:0}
+@media(max-width:650px){#app.viewer-wide{height:100dvh;min-height:0;overflow:hidden}#app.viewer-wide .workspace{flex:1;min-height:0}#app.viewer-wide .viewport-col{height:100%;min-height:0}#app.viewer-wide #viewport{min-height:0}#app.viewer-wide .transport{flex:none}}

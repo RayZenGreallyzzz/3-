@@ -8,6 +8,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import './style.css';
 
 const $ = (id) => document.getElementById(id);
@@ -57,7 +58,8 @@ transform.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; 
 transform.addEventListener('objectChange', () => { refreshFields(); refreshExport(); });
 const state = { character: null, weapon: null, bones: [], selectedBone: null, skeletonHelper: null,
   mixer: null, clips: [], action: null, clip: null, playing: false, time: 0,
-  characterName: null, weaponName: null, modelUrls: [], toastTimer: null };
+  characterName: null, weaponName: null, modelUrls: [], toastTimer: null,
+  gizmoVisible: true, exporting: false };
 
 function toast(message) {
   const t = $('toast');
@@ -83,8 +85,23 @@ function disposeObject(root) {
 function refreshModelActions() {
   $('reset-character').disabled = !state.character;
   $('clear-weapon').disabled = !state.weapon;
+  $('export-glb').disabled = !state.character && !state.weapon;
+  syncGizmoVisibility();
   $('model-badge').textContent = state.characterName || state.weaponName || 'Сцена пуста';
   $('empty-state').classList.toggle('hidden', !!(state.character || state.weapon));
+}
+function syncGizmoVisibility() {
+  const enabled = !!state.weapon && state.gizmoVisible;
+  transform.getHelper().visible = enabled;
+  transform.enabled = enabled;
+  $('gizmo-toggle').disabled = !state.weapon;
+  $('gizmo-toggle').textContent = enabled ? '◉ Скрыть стрелки' : '◎ Показать стрелки';
+  $('gizmo-toggle').setAttribute('aria-pressed', String(enabled));
+  $('gizmo-hint').textContent = enabled ? 'Оси оружия видны' : 'Чистый просмотр';
+}
+function setGizmoVisible(value) {
+  state.gizmoVisible = Boolean(value);
+  syncGizmoVisibility();
 }
 function resetCharacter() {
   // Preserve weapon world position before removing the animated skeleton.
@@ -267,6 +284,7 @@ async function importModel(kind, files) {
       // Put a new weapon near the origin; never silently change its scale.
       state.weapon.position.set(0,0,0);
       transform.attach(state.weapon);
+      setGizmoVisible(true);
       if (!state.character) frameObject(state.weapon);
       $('weapon-file').textContent = loaded.name;
       toast('Оружие загружено. Выбери кость и нажми «Привязать».');
@@ -337,8 +355,9 @@ function attachWeapon() {
   state.selectedBone.updateWorldMatrix(true,true);
   state.selectedBone.attach(state.weapon); // preserve world transform at current pose
   transform.attach(state.weapon);
+  setGizmoVisible(false);
   refreshFields(); refreshExport();
-  toast('Оружие привязано к '+state.selectedBone.name+'. Настрой локальные координаты.');
+  toast('Оружие привязано к '+state.selectedBone.name+'. Оси скрыты для просмотра; нажми «Показать стрелки» для настройки.');
 }
 function detachWeapon() {
   if (!state.weapon) return toast('Сначала загрузи оружие');
@@ -449,6 +468,15 @@ button('clear-weapon',()=>{
   frameObject(state.character);
   toast('Оружие удалено. Персонаж сохранён.');
 });
+button('gizmo-toggle',()=>setGizmoVisible(!state.gizmoVisible));
+button('wide-toggle',()=>{
+  const open=$('app').classList.toggle('viewer-wide');
+  $('wide-toggle').classList.toggle('active',open);
+  $('wide-toggle').setAttribute('title',open?'Показать редактор':'Развернуть 3D-сцену');
+  $('wide-toggle').setAttribute('aria-label',open?'Показать редактор':'Развернуть 3D-сцену');
+  $('wide-toggle').textContent = open ? '↙' : '⛶';
+  requestAnimationFrame(resize);
+});
 button('attach-weapon',attachWeapon);
 button('detach-weapon',detachWeapon);
 button('reset-weapon',()=> {
@@ -468,6 +496,8 @@ for (const modeButton of document.querySelectorAll('[data-mode]')) {
     document.querySelectorAll('[data-mode]').forEach(btn=>btn.classList.remove('selected'));
     modeButton.classList.add('selected');
     transform.setMode(modeButton.dataset.mode);
+    // Choosing an editing mode returns to manipulation after clean preview.
+    setGizmoVisible(true);
   });
 }
 $('gizmo-space').addEventListener('change',e=>transform.setSpace(e.target.value));
@@ -489,6 +519,59 @@ button('copy-transform',async()=>{
   const copied=await copyText(JSON.stringify(info,null,2));
   toast(copied?'Точные координаты скопированы':'Не удалось скопировать — сохрани JSON в файл');
 });
+function downloadBlob(content,filename,type) {
+  const blob = content instanceof Blob ? content : new Blob([content],{type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+
+async function exportSceneGLB() {
+  if (state.exporting) return;
+  if (!state.character && !state.weapon) return toast('Сначала загрузи персонажа или оружие');
+  state.exporting = true;
+  const btn = $('export-glb');
+  const before = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Подготавливаем GLB…';
+  setStatus('ЭКСПОРТ');
+  const exportScene = new THREE.Scene();
+  // Put real objects into the export scene temporarily to preserve the original skinning.
+  // Do not clone SkinnedMesh with regular clone(); its skeleton references may break.
+  const exportCharacter = state.character;
+  const exportWeapon = state.weapon;
+  const detachedWeapon = exportWeapon && (!exportCharacter || !exportCharacter.getObjectById(exportWeapon.id));
+  try {
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    if(exportCharacter) exportScene.add(exportCharacter);
+    if(detachedWeapon) exportScene.add(exportWeapon);
+    exportScene.updateMatrixWorld(true);
+    const exporter = new GLTFExporter();
+    const result = await exporter.parseAsync(exportScene,{
+      binary: true,
+      trs: true,
+      onlyVisible: true,
+      animations: exportCharacter ? state.clips : []
+    });
+    const baseName = (state.characterName || state.weaponName || 'rig-weapon').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]+/g,'_').slice(0,70);
+    downloadBlob(result,baseName+'_weapon.glb','model/gltf-binary');
+    toast('GLB подготовлен: персонаж, оружие и совместимые анимации.');
+  } catch(error) {
+    console.error('GLB export failed', error);
+    toast('Не удалось экспортировать GLB: '+(error?.message||'ошибка конвертации'));
+  } finally {
+    if(exportCharacter) scene.add(exportCharacter);
+    if(detachedWeapon) scene.add(exportWeapon);
+    scene.updateMatrixWorld(true);
+    state.exporting = false;
+    btn.disabled = !state.character && !state.weapon;
+    btn.textContent = before;
+    setStatus('ГОТОВ');
+  }
+}
+button('export-glb',exportSceneGLB);
+
 button('download-transform',()=>{
   const info=transformInfo();if(!info)return toast('Сначала загрузи оружие');
   const blob=new Blob([JSON.stringify(info,null,2)],{type:'application/json'});
