@@ -24,6 +24,13 @@ jobs:
         run: npm run build
       - name: Generate Android project
         run: npx cap add android
+      - name: Apply custom Android launcher icon
+        run: |
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/mipmap-anydpi-v26
+          cp branding/android/rig_launcher_foreground.xml android/app/src/main/res/drawable/rig_launcher_foreground.xml
+          cp branding/android/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          cp branding/android/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
       - name: Synchronize web assets
         run: npx cap sync android
       - name: Assemble debug APK
