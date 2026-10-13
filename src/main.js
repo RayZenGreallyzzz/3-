@@ -80,14 +80,25 @@ function disposeObject(root) {
     }
   });
 }
+function refreshModelActions() {
+  $('reset-character').disabled = !state.character;
+  $('clear-weapon').disabled = !state.weapon;
+  $('model-badge').textContent = state.characterName || state.weaponName || 'Сцена пуста';
+  $('empty-state').classList.toggle('hidden', !!(state.character || state.weapon));
+}
 function resetCharacter() {
+  // Preserve weapon world position before removing the animated skeleton.
   if (state.weapon?.parent && state.weapon.parent !== scene) scene.attach(state.weapon);
   if (state.mixer) { state.mixer.stopAllAction(); state.mixer.uncacheRoot(state.character); }
   if (state.skeletonHelper) { scene.remove(state.skeletonHelper); state.skeletonHelper.geometry.dispose(); state.skeletonHelper.material.dispose(); }
   if (state.character) { scene.remove(state.character); disposeObject(state.character); }
   Object.assign(state, {character:null,bones:[],selectedBone:null,skeletonHelper:null,mixer:null,clips:[],action:null,clip:null,playing:false,time:0,characterName:null});
+  $('character-file').textContent = 'Загрузить';
+  $('bone-search').value = '';
   renderBones();
   updateAnimationList();
+  refreshModelActions();
+  refreshFields(); refreshExport();
 }
 function resetWeapon() {
   transform.detach();
@@ -96,6 +107,7 @@ function resetWeapon() {
   state.weaponName = null;
   $('weapon-file').textContent = 'Загрузить';
   refreshFields(); refreshExport();
+  refreshModelActions();
 }
 
 function getMainFile(files) {
@@ -261,6 +273,7 @@ async function importModel(kind, files) {
     }
     refreshFields(); refreshExport();
     showEditor();
+    refreshModelActions();
   } catch (error) {
     console.error('Model loading failed',error);
     toast('Ошибка загрузки: '+(error?.message || 'неизвестный формат'));
@@ -424,6 +437,18 @@ for (const [id,kind] of [['file-character','character'],['file-weapon','weapon']
 button('empty-load',()=> $('file-character').click());
 button('character-load',()=> $('file-character').click());
 button('weapon-load',()=> $('file-weapon').click());
+button('reset-character',()=>{
+  if(!state.character) return;
+  resetCharacter();
+  frameObject(state.weapon);
+  toast('Персонаж и его анимации удалены. Оружие сохранено.');
+});
+button('clear-weapon',()=>{
+  if(!state.weapon) return;
+  resetWeapon();
+  frameObject(state.character);
+  toast('Оружие удалено. Персонаж сохранён.');
+});
 button('attach-weapon',attachWeapon);
 button('detach-weapon',detachWeapon);
 button('reset-weapon',()=> {
@@ -508,3 +533,4 @@ function animate(){
 }
 animate();
 refreshFields();refreshExport();
+refreshModelActions();

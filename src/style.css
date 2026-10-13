@@ -29,3 +29,10 @@
 @media(max-width:650px){#start-screen{padding:12px 11px}.start-content{padding:15px 13px}.start-art-wrap{height:clamp(175px,33vh,300px);margin:0 auto 8px}.start-content h1{font-size:clamp(27px,7.5vw,36px)}.start-description{margin:11px auto 7px;font-size:11px}.start-overline{font-size:9px}.start-buttons button{min-height:45px;font-size:12px}.start-divider{margin:12px 0 8px}.start-features span{font-size:8px;padding:6px 8px}.start-bottom{margin-top:13px}}
 @media(max-height:640px){.start-art-wrap{height:30vh;min-height:125px}.start-content{padding:10px}.start-content h1{font-size:26px}.start-description{margin:8px auto}.start-buttons button{min-height:38px}.start-bottom{margin-top:8px}}
 @media(prefers-reduced-motion:reduce){.start-art{animation:none}}
+
+/* Independent model removal; the existing transform reset still resets only coordinates. */
+.model-reset-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+.model-reset-button{min-width:0;min-height:38px;background:#222339;border:1px solid #6b4c6b;color:#e4c7d9;font-size:10px;font-weight:800;padding:8px 4px}
+.model-reset-button:enabled:hover{background:#44283d;border-color:#ef8dba;color:#fff}
+.model-reset-button:disabled{color:#617086;border-color:#30384c;background:#151c2b;opacity:.7}
+@media(max-width:370px){.model-reset-actions{gap:6px}.model-reset-button{font-size:9px;padding:8px 3px}}
