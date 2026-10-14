@@ -213,6 +213,34 @@ function findBones(root) {
   root.traverse(node => {if(node.isBone) found.push(node);});
   return found;
 }
+function hasRenderableMesh(root) {
+  let hasMesh = false;
+  root.traverse(node => { if (node.isMesh) hasMesh = true; });
+  return hasMesh;
+}
+function findEmbeddedWeapon(root, originalFileName) {
+  // Our newer GLBs identify the weapon explicitly via glTF node extras.
+  let tagged = null;
+  root.traverse(node => {
+    if (!tagged && node !== root && node.userData?.rigWeaponStudioRole === 'weapon'
+        && hasRenderableMesh(node)) tagged = node;
+  });
+  if (tagged) return tagged;
+
+  // Compatibility with v0.2/v0.3 GLBs already saved on the tablet:
+  // those files were named *_weapon.glb, but lacked identification metadata.
+  // Only search for a mesh under a bone for such files; otherwise character
+  // attachments, hats, etc. must never be silently reclassified as weapons.
+  if (!/_weapon\.(glb|gltf)$/i.test(originalFileName || '')) return null;
+  const bones = findBones(root);
+  const preferred = bones.filter(bone => /hand|wrist|weapon|grip/i.test(bone.name));
+  for (const bone of [...preferred, ...bones.filter(b => !preferred.includes(b))]) {
+    const candidate = bone.children.find(child =>
+      !child.isBone && hasRenderableMesh(child));
+    if (candidate) return candidate;
+  }
+  return null;
+}
 function renderBones() {
   const filter = $('bone-search').value.trim().toLowerCase();
   $('bone-count').textContent = state.bones.length + ' костей';
@@ -267,10 +295,22 @@ async function importModel(kind, files) {
       scene.add(state.character);
       state.character.updateWorldMatrix(true,true);
       state.bones = findBones(state.character);
+      // A previously exported GLB includes the weapon as a child of the
+      // character hierarchy; expose that child to the weapon editor again.
+      const embeddedWeapon = findEmbeddedWeapon(state.character, loaded.name);
+      if (embeddedWeapon) {
+        if (state.weapon) resetWeapon();
+        state.weapon = embeddedWeapon;
+        state.weaponName = embeddedWeapon.name || 'Оружие из GLB';
+        $('weapon-file').textContent = state.weaponName;
+        transform.attach(state.weapon);
+        setGizmoVisible(false);
+      }
       renderBones();
       if (state.bones.length) {
         const likely = state.bones.find(b => /right(hand|wrist)|hand[_ .-]?r|r[_ .-]?hand|mixamorig.*righthand/i.test(b.name));
-        if (likely) state.selectedBone = likely;
+        if (state.weapon?.parent?.isBone) state.selectedBone = state.weapon.parent;
+        else if (likely) state.selectedBone = likely;
         renderBones();
         state.skeletonHelper = new THREE.SkeletonHelper(state.character);
         state.skeletonHelper.visible = $('bone-toggle').classList.contains('active');
@@ -284,7 +324,9 @@ async function importModel(kind, files) {
       frameObject(state.character);
       $('character-file').textContent = loaded.name;
       $('model-badge').textContent = loaded.name;
-      toast('Персонаж загружен: '+loaded.name);
+      toast(embeddedWeapon
+        ? 'Персонаж, анимации и редактируемое оружие загружены из GLB'
+        : 'Персонаж загружен: '+loaded.name);
     } else {
       resetWeapon();
       state.weapon = loaded.root;
@@ -628,6 +670,9 @@ async function exportSceneGLB() {
   // temporarily, NOT by cloning Skeleton / SkinnedMesh objects.
   const exportCharacter = state.character;
   const exportWeapon = state.weapon;
+  // glTF extras survive reload. They identify the weapon separately from
+  // the character so it can be edited again in another Rig & Weapon session.
+  if (exportWeapon) exportWeapon.userData.rigWeaponStudioRole = 'weapon';
   const detachedWeapon = exportWeapon && (!exportCharacter || !exportCharacter.getObjectById(exportWeapon.id));
   try {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
