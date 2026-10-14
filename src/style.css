@@ -49,3 +49,22 @@
 @media(max-width:650px){#app.viewer-wide{height:100dvh;min-height:0;overflow:hidden}#app.viewer-wide .workspace{flex:1;min-height:0}#app.viewer-wide .viewport-col{height:100%;min-height:0}#app.viewer-wide #viewport{min-height:0}#app.viewer-wide .transport{flex:none}}
 
 .save-status{color:#b1d3f0;font-size:11px;line-height:1.45;margin-top:9px;overflow-wrap:anywhere;padding:9px 10px;background:#162840;border:1px solid #365276;border-radius:8px;}
+
+/* v0.4: responsive additive hand/arm pose controls */
+.arm-pose-panel{background:linear-gradient(170deg,#172036 0%,#121a2b 85%)}
+.pose-segment,.pose-joints{display:grid;gap:6px}
+.pose-segment{grid-template-columns:1fr 1fr;margin-bottom:9px}
+.pose-joints{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:10px}
+.pose-segment button,.pose-joints button{min-height:37px;border:1px solid #354769;background:#1b2740;color:#91a4c4;border-radius:9px;font-weight:700;padding:7px 3px;font-size:10px;white-space:nowrap}
+.pose-segment button.selected,.pose-joints button.selected{background:linear-gradient(120deg,#353a74,#35466f);border-color:#8a85f8;color:white;box-shadow:0 0 0 1px #817be922 inset}
+.pose-bone-summary{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:baseline;font-size:11px;color:#8293b1;margin:9px 0;line-height:1.5}
+.pose-bone-summary strong{color:#bfe5ff;font-size:11px;overflow-wrap:anywhere}
+.pose-manual{width:100%;font-size:10px;padding:8px 6px;border-color:#354b68;margin-bottom:13px}
+.pose-axes{display:grid;gap:8px}
+.pose-axis{display:grid;grid-template-columns:14px minmax(0,1fr) 66px 8px;align-items:center;gap:7px;font-size:11px;font-weight:800}
+.pose-axis input[type=range]{min-width:0;width:100%;accent-color:#877cff;touch-action:pan-y;min-height:26px}
+.pose-axis input[type=number]{min-width:0;padding:7px 5px;text-align:center;font-size:12px}
+.pose-axis-x>span:first-child{color:#ed828e}.pose-axis-y>span:first-child{color:#80d4aa}.pose-axis-z>span:first-child{color:#7faeff}
+.pose-reset-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}
+.pose-reset-actions .btn{min-width:0;font-size:10px;padding:9px 5px;min-height:37px}
+@media(max-width:380px){.pose-joints button{font-size:9px}.pose-axis{grid-template-columns:13px minmax(0,1fr) 58px 8px;gap:5px}}

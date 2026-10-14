@@ -10,6 +10,7 @@ import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { ArmPoseController, POSE_LIMITS, POSE_LABELS, resolveArmBones, identifyArmBone, bakePoseClips } from './arm-pose.js';
 import './style.css';
 
 const NativeFileSaver = registerPlugin('NativeFileSaver');
@@ -61,7 +62,9 @@ transform.addEventListener('objectChange', () => { refreshFields(); refreshExpor
 const state = { character: null, weapon: null, bones: [], selectedBone: null, skeletonHelper: null,
   mixer: null, clips: [], action: null, clip: null, playing: false, time: 0,
   characterName: null, weaponName: null, modelUrls: [], toastTimer: null,
-  gizmoVisible: true, exporting: false };
+  gizmoVisible: true, exporting: false, poseSide: 'right', poseJoint: 'upper',
+  poseArmBones: {left:{},right:{}}, poseManualBone: null };
+const armPose = new ArmPoseController();
 
 function toast(message) {
   const t = $('toast');
@@ -91,6 +94,7 @@ function refreshModelActions() {
   syncGizmoVisibility();
   $('model-badge').textContent = state.characterName || state.weaponName || 'Сцена пуста';
   $('empty-state').classList.toggle('hidden', !!(state.character || state.weapon));
+  refreshPoseUI();
 }
 function syncGizmoVisibility() {
   const enabled = !!state.weapon && state.gizmoVisible;
@@ -110,8 +114,10 @@ function resetCharacter() {
   if (state.weapon?.parent && state.weapon.parent !== scene) scene.attach(state.weapon);
   if (state.mixer) { state.mixer.stopAllAction(); state.mixer.uncacheRoot(state.character); }
   if (state.skeletonHelper) { scene.remove(state.skeletonHelper); state.skeletonHelper.geometry.dispose(); state.skeletonHelper.material.dispose(); }
+  armPose.clearAll();
   if (state.character) { scene.remove(state.character); disposeObject(state.character); }
-  Object.assign(state, {character:null,bones:[],selectedBone:null,skeletonHelper:null,mixer:null,clips:[],action:null,clip:null,playing:false,time:0,characterName:null});
+  Object.assign(state, {character:null,bones:[],selectedBone:null,skeletonHelper:null,mixer:null,clips:[],action:null,clip:null,playing:false,time:0,characterName:null,
+    poseArmBones:{left:{},right:{}},poseManualBone:null});
   $('character-file').textContent = 'Загрузить';
   $('bone-search').value = '';
   renderBones();
@@ -295,6 +301,8 @@ async function importModel(kind, files) {
       scene.add(state.character);
       state.character.updateWorldMatrix(true,true);
       state.bones = findBones(state.character);
+      state.poseArmBones = resolveArmBones(state.bones);
+      state.poseManualBone = null;
       // A previously exported GLB includes the weapon as a child of the
       // character hierarchy; expose that child to the weapon editor again.
       const embeddedWeapon = findEmbeddedWeapon(state.character, loaded.name);
@@ -340,7 +348,7 @@ async function importModel(kind, files) {
       $('weapon-file').textContent = loaded.name;
       toast('Оружие загружено. Выбери кость и нажми «Привязать».');
     }
-    refreshFields(); refreshExport();
+    refreshFields(); refreshExport(); refreshPoseUI();
     showEditor();
     refreshModelActions();
   } catch (error) {
@@ -376,7 +384,9 @@ function selectClip(index) {
   state.action.timeScale = Number($('animation-speed').value);
   state.playing = false;
   state.time = 0;
+  armPose.restore();
   state.mixer.update(0);
+  armPose.apply();
   $('animation-play').textContent = '▶';
   $('animation-seek').value = '0';
   refreshAnimationTime();
@@ -390,7 +400,9 @@ function setTime(t) {
   if (!state.action) return;
   state.time = THREE.MathUtils.clamp(t,0,state.clip.duration);
   state.action.time = state.time;
+  armPose.restore();
   state.mixer.update(0);
+  armPose.apply();
   refreshAnimationTime();
   refreshExport();
 }
@@ -421,6 +433,66 @@ function detachWeapon() {
   transform.attach(state.weapon);
   refreshFields(); refreshExport();
   toast('Оружие отвязано, мировое положение сохранено');
+}
+function currentPoseBone() {
+  return state.poseManualBone || state.poseArmBones[state.poseSide]?.[state.poseJoint] || null;
+}
+function refreshPoseUI() {
+  const bone = currentPoseBone();
+  const name = $('pose-bone-label');
+  if (!name) return;
+  for (const button of document.querySelectorAll('[data-pose-side]'))
+    button.classList.toggle('selected', button.dataset.poseSide === state.poseSide);
+  for (const button of document.querySelectorAll('[data-pose-joint]'))
+    button.classList.toggle('selected', button.dataset.poseJoint === state.poseJoint && !state.poseManualBone);
+  name.textContent = bone?.name || (state.character
+    ? 'Кость не найдена — выбери нужную в списке выше'
+    : 'Сначала загрузи персонажа со скелетом');
+  const limit = POSE_LIMITS[state.poseJoint];
+  const angles = bone ? armPose.get(bone) : {x:0, y:0, z:0};
+  for (const axis of ['x','y','z']) {
+    const slider = $('pose-'+axis);
+    const field = $('pose-'+axis+'-number');
+    slider.min = String(-limit);
+    slider.max = String(limit);
+    field.min = String(-limit);
+    field.max = String(limit);
+    slider.disabled = !bone;
+    field.disabled = !bone;
+    slider.value = String(angles[axis]);
+    if (document.activeElement !== field) field.value = String(angles[axis]);
+  }
+  $('pose-choose-bone').disabled = !state.selectedBone;
+  $('pose-reset-joint').disabled = !bone || !armPose.offsets.has(bone);
+  $('pose-reset-arm').disabled = !state.character || ![...armPose.offsets.keys()].some(bone => {
+    const classification = identifyArmBone(bone);
+    return classification?.side === state.poseSide;
+  });
+  $('pose-bone-help').textContent = bone
+    ? 'Локальные повороты ±'+limit+'°. Ноги и таз не меняются.'
+    : 'Используй ручной выбор кости для нестандартного скелета.';
+}
+function setPoseRotation(axis, rawValue) {
+  const bone = currentPoseBone();
+  if (!bone || state.exporting) return;
+  const limit = POSE_LIMITS[state.poseJoint];
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) return;
+  const angles = armPose.get(bone);
+  angles[axis] = THREE.MathUtils.clamp(value, -limit, limit);
+  armPose.set(bone, angles);
+  refreshPoseUI();
+  refreshExport();
+}
+function selectPoseSide(side) {
+  state.poseSide = side;
+  state.poseManualBone = null;
+  refreshPoseUI();
+}
+function selectPoseJoint(joint) {
+  state.poseJoint = joint;
+  state.poseManualBone = null;
+  refreshPoseUI();
 }
 function nearestBoneName(node) {
   if (!node?.isBone) return null;
@@ -535,6 +607,35 @@ button('wide-toggle',()=>{
 });
 button('attach-weapon',attachWeapon);
 button('detach-weapon',detachWeapon);
+for (const btn of document.querySelectorAll('[data-pose-side]'))
+  btn.addEventListener('click', () => selectPoseSide(btn.dataset.poseSide));
+for (const btn of document.querySelectorAll('[data-pose-joint]'))
+  btn.addEventListener('click', () => selectPoseJoint(btn.dataset.poseJoint));
+button('pose-choose-bone', () => {
+  if (!state.selectedBone?.isBone) return toast('Выбери кость из списка выше');
+  state.poseManualBone = state.selectedBone;
+  const matched = identifyArmBone(state.selectedBone);
+  if (matched) { state.poseSide = matched.side; state.poseJoint = matched.joint; }
+  refreshPoseUI();
+  toast('Настраиваем кость: ' + state.selectedBone.name);
+});
+for (const axis of ['x','y','z']) {
+  $('pose-'+axis).addEventListener('input', event => setPoseRotation(axis, event.target.value));
+  $('pose-'+axis+'-number').addEventListener('change', event => setPoseRotation(axis, event.target.value));
+}
+button('pose-reset-joint', () => {
+  const bone = currentPoseBone();
+  if (!bone) return;
+  armPose.clearBones([bone]);
+  refreshPoseUI();
+  toast('Поворот сустава сброшен');
+});
+button('pose-reset-arm', () => {
+  const affected = [...armPose.offsets.keys()].filter(bone => identifyArmBone(bone)?.side === state.poseSide);
+  armPose.clearBones(affected);
+  refreshPoseUI();
+  toast('Поправки ' + (state.poseSide === 'right' ? 'правой' : 'левой') + ' руки сброшены');
+});
 button('reset-weapon',()=> {
   if(!state.weapon)return toast('Сначала загрузи оружие');
   state.weapon.position.set(0,0,0);state.weapon.rotation.set(0,0,0);state.weapon.scale.set(1,1,1);
@@ -674,18 +775,32 @@ async function exportSceneGLB() {
   // the character so it can be edited again in another Rig & Weapon session.
   if (exportWeapon) exportWeapon.userData.rigWeaponStudioRole = 'weapon';
   const detachedWeapon = exportWeapon && (!exportCharacter || !exportCharacter.getObjectById(exportWeapon.id));
+  const playingBeforeSave = state.playing;
+  if (state.action) state.action.paused = true;
+  state.playing = false;
+  let objectsInExportScene = false;
+  const restoreExportScene = () => {
+    if (!objectsInExportScene) return;
+    if (exportCharacter) scene.add(exportCharacter);
+    if (detachedWeapon) scene.add(exportWeapon);
+    scene.updateMatrixWorld(true);
+    objectsInExportScene = false;
+  };
   try {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     if (exportCharacter) exportScene.add(exportCharacter);
     if (detachedWeapon) exportScene.add(exportWeapon);
+    objectsInExportScene = true;
     exportScene.updateMatrixWorld(true);
     const exporter = new GLTFExporter();
+    const processed = bakePoseClips(state.clips, armPose.offsets);
+    const animationsForExport = exportCharacter ? processed.clips : [];
     let result;
     let missingAnimations = false;
     try {
       result = await exporter.parseAsync(exportScene, {
         binary: true, trs: true, onlyVisible: true,
-        animations: exportCharacter ? state.clips : []
+        animations: animationsForExport
       });
     } catch (animationError) {
       // Some FBX animation tracks cannot be represented by glTF.
@@ -698,6 +813,7 @@ async function exportSceneGLB() {
       });
       missingAnimations = true;
     }
+    restoreExportScene();
     const gltf = verifyGlbBuffer(result);
     const nodes = gltf.nodes || [];
     if (exportCharacter && !nodes.some(n => n.name === exportCharacter.name))
@@ -708,7 +824,8 @@ async function exportSceneGLB() {
       .replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 70);
     const filename = (baseName || 'character') + '_weapon.glb';
     const mbs = (result.byteLength / 1048576).toFixed(1);
-    showExportStatus('GLB готов (' + mbs + ' МБ). Выбери папку и имя файла в окне Android.');
+    const poseWarning = processed.skipped ? ' Некоторые нестандартные треки позы не удалось преобразовать.' : '';
+    showExportStatus('GLB готов (' + mbs + ' МБ). Выбери папку и имя файла в окне Android.' + poseWarning);
     btn.textContent = '⏳ Передача файла…';
     const outcome = await saveFile(result, filename, 'model/gltf-binary', p => {
       btn.textContent = p < 100 ? '⏳ Подготовка сохранения ' + p + '%' : '📁 Выбери папку…';
@@ -733,9 +850,11 @@ async function exportSceneGLB() {
     toast('Ошибка: ' + details);
     setStatus('ОШИБКА');
   } finally {
-    if (exportCharacter) scene.add(exportCharacter);
-    if (detachedWeapon) scene.add(exportWeapon);
-    scene.updateMatrixWorld(true);
+    restoreExportScene();
+    if (playingBeforeSave && state.action) {
+      state.playing = true;
+      state.action.paused = false;
+    }
     state.exporting = false;
     btn.disabled = !state.character && !state.weapon;
     btn.textContent = '📁 Сохранить GLB…';
@@ -779,7 +898,9 @@ function animate(){
   requestAnimationFrame(animate);
   const delta=Math.min(clock.getDelta(),.1);
   if(state.playing && state.mixer && state.action){
+    armPose.restore();
     state.mixer.update(delta);
+    armPose.apply();
     state.time=state.action.time;
     displayAcc += delta;
     if(displayAcc>=.06) {refreshAnimationTime();refreshExport();displayAcc=0;}
@@ -792,3 +913,4 @@ function animate(){
 animate();
 refreshFields();refreshExport();
 refreshModelActions();
+refreshPoseUI();
