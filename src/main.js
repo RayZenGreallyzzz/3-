@@ -234,9 +234,16 @@ function renderBones() {
   });
 }
 function showEditor() {
-  $('start-screen').classList.add('closed');
-  $('empty-state').classList.add('hidden');
-  setTimeout(() => { $('start-screen')?.remove(); resize(); }, 380);
+  // Opening a second character/weapon must work after the original splash
+  // element has already been removed during the first import.
+  const splashScreen = $('start-screen');
+  if (splashScreen) {
+    splashScreen.classList.add('closed');
+    setTimeout(() => { splashScreen.remove(); resize(); }, 380);
+  } else {
+    resize();
+  }
+  $('empty-state')?.classList.toggle('hidden', !!(state.character || state.weapon));
 }
 function startLoading(filename) {
   $('loading-file').textContent = filename;
@@ -298,7 +305,12 @@ async function importModel(kind, files) {
     console.error('Model loading failed',error);
     toast('Ошибка загрузки: '+(error?.message || 'неизвестный формат'));
     setStatus('ОШИБКА');
-  } finally { finishLoading(); }
+  } finally {
+    finishLoading();
+    // Keep the buttons and empty-scene overlay synchronized even if an
+    // imported file triggers an error after its scene objects were loaded.
+    refreshModelActions();
+  }
 }
 function updateAnimationList() {
   const select = $('animation-select');
