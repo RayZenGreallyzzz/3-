@@ -33,6 +33,11 @@ jobs:
           cp branding/android/rig_launcher_foreground.xml android/app/src/main/res/drawable/rig_launcher_foreground.xml
           cp branding/android/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           cp branding/android/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+      - name: Add native Android file-save picker
+        run: |
+          mkdir -p android/app/src/main/java/com/rayzeng/rigweaponstudio
+          cp branding/android/native/MainActivity.java android/app/src/main/java/com/rayzeng/rigweaponstudio/MainActivity.java
+          cp branding/android/native/NativeFileSaverPlugin.java android/app/src/main/java/com/rayzeng/rigweaponstudio/NativeFileSaverPlugin.java
       - name: Synchronize web assets
         run: npx cap sync android
       - name: Assemble debug APK

@@ -47,3 +47,5 @@
 #app.viewer-wide .sidebar{display:none!important}
 #app.viewer-wide .viewport-col{height:100%;min-height:0}
 @media(max-width:650px){#app.viewer-wide{height:100dvh;min-height:0;overflow:hidden}#app.viewer-wide .workspace{flex:1;min-height:0}#app.viewer-wide .viewport-col{height:100%;min-height:0}#app.viewer-wide #viewport{min-height:0}#app.viewer-wide .transport{flex:none}}
+
+.save-status{color:#b1d3f0;font-size:11px;line-height:1.45;margin-top:9px;overflow-wrap:anywhere;padding:9px 10px;background:#162840;border:1px solid #365276;border-radius:8px;}

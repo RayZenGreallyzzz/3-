@@ -9,8 +9,10 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import './style.css';
 
+const NativeFileSaver = registerPlugin('NativeFileSaver');
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
 const scene = new THREE.Scene();
@@ -519,13 +521,85 @@ button('copy-transform',async()=>{
   const copied=await copyText(JSON.stringify(info,null,2));
   toast(copied?'Точные координаты скопированы':'Не удалось скопировать — сохрани JSON в файл');
 });
-function downloadBlob(content,filename,type) {
-  const blob = content instanceof Blob ? content : new Blob([content],{type});
+
+function downloadBlob(content, filename, type) {
+  const blob = content instanceof Blob ? content : new Blob([content], {type});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename;
+  a.href = url;
+  a.download = filename;
   document.body.append(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// Android WebView does not reliably honor <a download> for in-memory blobs.
+// Use the native Android Storage Access Framework (ACTION_CREATE_DOCUMENT):
+// it lets the user pick a folder, create a folder if supported, and name the file.
+async function saveFile(content, filename, mimeType, onProgress = () => {}) {
+  const data = content instanceof ArrayBuffer ? new Uint8Array(content)
+    : content instanceof Uint8Array ? content
+    : new TextEncoder().encode(String(content));
+  if (Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform()) {
+    await NativeFileSaver.beginFile({ filename, mimeType });
+    try {
+      const chunkSize = 96 * 1024;
+      for (let offset = 0; offset < data.byteLength; offset += chunkSize) {
+        const chunk = data.subarray(offset, Math.min(offset + chunkSize, data.byteLength));
+        let binary = '';
+        for (let i = 0; i < chunk.length; i += 1) binary += String.fromCharCode(chunk[i]);
+        await NativeFileSaver.appendChunk({ data: btoa(binary) });
+        if (offset % (chunkSize * 8) === 0) {
+          onProgress(Math.min(100, Math.round((offset + chunk.length) * 100 / data.byteLength)));
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      onProgress(100);
+      const response = await NativeFileSaver.finishFile();
+      return { saved: Boolean(response.saved), cancelled: Boolean(response.cancelled) };
+    } catch (error) {
+      try { await NativeFileSaver.cancelFile(); } catch (_) {}
+      throw error;
+    }
+  }
+  // Desktop browser: showSaveFilePicker if available and permitted by browser.
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: mimeType === 'application/json' ? 'JSON' : '3D GLB', accept: { [mimeType]: [filename.endsWith('.json') ? '.json' : '.glb'] } }]
+      });
+      const writable = await handle.createWritable();
+      try { await writable.write(data); await writable.close(); }
+      catch (error) { await writable.abort().catch(() => {}); throw error; }
+      return { saved: true, cancelled: false };
+    } catch (error) {
+      if (error?.name === 'AbortError') return { saved: false, cancelled: true };
+      if (error?.name !== 'SecurityError' && error?.name !== 'NotAllowedError') throw error;
+    }
+  }
+  // Non-native fallback: browser-managed download (may not offer a folder picker).
+  downloadBlob(data, filename, mimeType);
+  return { saved: false, cancelled: false, browserDownload: true };
+}
+
+function verifyGlbBuffer(buffer) {
+  if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 28)
+    throw new Error('Экспортёр вернул пустой или повреждённый GLB');
+  const view = new DataView(buffer);
+  if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== buffer.byteLength)
+    throw new Error('Неверный заголовок GLB');
+  if (view.getUint32(16, true) !== 0x4e4f534a)
+    throw new Error('В GLB отсутствует JSON-описание');
+  const jsonSize = view.getUint32(12, true);
+  if (!jsonSize || 20 + jsonSize > buffer.byteLength) throw new Error('Повреждённый JSON-блок GLB');
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, jsonSize)));
+  if (!gltf.asset || !gltf.scenes?.length || !gltf.nodes?.length)
+    throw new Error('Экспортированный GLB не содержит модели');
+  return gltf;
+}
+
+function showExportStatus(message) {
+  $('export-status').textContent = message;
 }
 
 async function exportSceneGLB() {
@@ -533,51 +607,95 @@ async function exportSceneGLB() {
   if (!state.character && !state.weapon) return toast('Сначала загрузи персонажа или оружие');
   state.exporting = true;
   const btn = $('export-glb');
-  const before = btn.textContent;
-  btn.disabled = true; btn.textContent = '⏳ Подготавливаем GLB…';
+  btn.disabled = true;
+  btn.textContent = '⏳ Подготавливаем GLB…';
+  showExportStatus('Подготовка модели для сохранения…');
   setStatus('ЭКСПОРТ');
   const exportScene = new THREE.Scene();
-  // Put real objects into the export scene temporarily to preserve the original skinning.
-  // Do not clone SkinnedMesh with regular clone(); its skeleton references may break.
+  // Preserve skinned meshes and bones by moving the original scene root
+  // temporarily, NOT by cloning Skeleton / SkinnedMesh objects.
   const exportCharacter = state.character;
   const exportWeapon = state.weapon;
   const detachedWeapon = exportWeapon && (!exportCharacter || !exportCharacter.getObjectById(exportWeapon.id));
   try {
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    if(exportCharacter) exportScene.add(exportCharacter);
-    if(detachedWeapon) exportScene.add(exportWeapon);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (exportCharacter) exportScene.add(exportCharacter);
+    if (detachedWeapon) exportScene.add(exportWeapon);
     exportScene.updateMatrixWorld(true);
     const exporter = new GLTFExporter();
-    const result = await exporter.parseAsync(exportScene,{
-      binary: true,
-      trs: true,
-      onlyVisible: true,
-      animations: exportCharacter ? state.clips : []
+    let result;
+    let missingAnimations = false;
+    try {
+      result = await exporter.parseAsync(exportScene, {
+        binary: true, trs: true, onlyVisible: true,
+        animations: exportCharacter ? state.clips : []
+      });
+    } catch (animationError) {
+      // Some FBX animation tracks cannot be represented by glTF.
+      // Still allow export of the character with its attached weapon,
+      // but warn clearly that its animations were not included.
+      if (!state.clips.length) throw animationError;
+      console.warn('Animation export failed, retry without clips:', animationError);
+      result = await new GLTFExporter().parseAsync(exportScene, {
+        binary: true, trs: true, onlyVisible: true, animations: []
+      });
+      missingAnimations = true;
+    }
+    const gltf = verifyGlbBuffer(result);
+    const nodes = gltf.nodes || [];
+    if (exportCharacter && !nodes.some(n => n.name === exportCharacter.name))
+      console.warn('Character root group not named in export; model nodes:', nodes.length);
+    if (exportWeapon && !nodes.some(n => n.name === exportWeapon.name))
+      throw new Error('В экспортируемом GLB потеряно оружие');
+    const baseName = (state.characterName || state.weaponName || 'rig-weapon')
+      .replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 70);
+    const filename = (baseName || 'character') + '_weapon.glb';
+    const mbs = (result.byteLength / 1048576).toFixed(1);
+    showExportStatus('GLB готов (' + mbs + ' МБ). Выбери папку и имя файла в окне Android.');
+    btn.textContent = '⏳ Передача файла…';
+    const outcome = await saveFile(result, filename, 'model/gltf-binary', p => {
+      btn.textContent = p < 100 ? '⏳ Подготовка сохранения ' + p + '%' : '📁 Выбери папку…';
     });
-    const baseName = (state.characterName || state.weaponName || 'rig-weapon').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]+/g,'_').slice(0,70);
-    downloadBlob(result,baseName+'_weapon.glb','model/gltf-binary');
-    toast('GLB подготовлен: персонаж, оружие и совместимые анимации.');
-  } catch(error) {
-    console.error('GLB export failed', error);
-    toast('Не удалось экспортировать GLB: '+(error?.message||'ошибка конвертации'));
+    if (outcome.saved) {
+      const notice = missingAnimations
+        ? 'GLB сохранён, но анимации не удалось включить. Модель и оружие сохранены.'
+        : 'GLB сохранён. Проверь модель, привязку оружия и анимации при повторной загрузке.';
+      showExportStatus(notice);
+      toast(notice);
+    } else if (outcome.cancelled) {
+      showExportStatus('Сохранение отменено. Модель осталась в редакторе.');
+      toast('Сохранение отменено');
+    } else {
+      showExportStatus('Файл передан браузеру. Проверь папку загрузок.');
+      toast('Открыта загрузка файла: ' + filename);
+    }
+  } catch (error) {
+    console.error('GLB export/save failed:', error);
+    const details = error?.message || String(error);
+    showExportStatus('Ошибка экспорта/сохранения: ' + details);
+    toast('Ошибка: ' + details);
+    setStatus('ОШИБКА');
   } finally {
-    if(exportCharacter) scene.add(exportCharacter);
-    if(detachedWeapon) scene.add(exportWeapon);
+    if (exportCharacter) scene.add(exportCharacter);
+    if (detachedWeapon) scene.add(exportWeapon);
     scene.updateMatrixWorld(true);
     state.exporting = false;
     btn.disabled = !state.character && !state.weapon;
-    btn.textContent = before;
-    setStatus('ГОТОВ');
+    btn.textContent = '📁 Сохранить GLB…';
+    if ($('state-indicator').textContent === '● ЭКСПОРТ') setStatus('ГОТОВ');
   }
 }
-button('export-glb',exportSceneGLB);
+button('export-glb', exportSceneGLB);
 
-button('download-transform',()=>{
-  const info=transformInfo();if(!info)return toast('Сначала загрузи оружие');
-  const blob=new Blob([JSON.stringify(info,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='weapon-transform.json';document.body.append(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+button('download-transform', async () => {
+  const info = transformInfo();
+  if (!info) return toast('Сначала загрузи оружие');
+  try {
+    const result = await saveFile(JSON.stringify(info, null, 2), 'weapon-transform.json', 'application/json');
+    toast(result.saved ? 'Координаты JSON сохранены' : result.cancelled ? 'Сохранение отменено' : 'JSON передан браузеру');
+  } catch (error) {
+    toast('Не удалось сохранить JSON: ' + (error?.message || 'неизвестная ошибка'));
+  }
 });
 
 function setupDrop(element){
