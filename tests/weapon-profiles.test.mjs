@@ -85,7 +85,8 @@ test('the app saves weapon before clip switch, playback and export; explicit but
  assert.ok(html.includes('id="save-weapon-clip"'));
  assert.ok(html.includes('id="reset-weapon-clip"'));
  assert.ok(main.includes('if(weaponDirty)commitWeapon();rememberArms();'));
- assert.ok(main.includes('weaponProfiles.apply(index,state.weapon)'));
+ assert.ok(main.includes('weaponMotionEditor.preview()'));
+ assert.ok(main.includes('weaponProfiles.apply(currentClipIndex(),state.weapon)'));
  assert.ok(main.includes('bakeWeaponAnimationClips(processed.clips,exportWeapon,weaponProfiles)'));
  assert.ok(main.includes('rigWeaponStudioWeaponProfiles=weaponProfiles.toJSON()'));
 });
