@@ -76,6 +76,7 @@ function refreshWeaponPresetUI(){
  const i=currentClipIndex(),ready=Boolean(state.weapon?.parent?.isBone&&i>=0);
  $('save-weapon-clip').disabled=!ready||state.exporting;
  $('reset-weapon-clip').disabled=!ready||state.exporting;
+ weaponMotionEditor.render();
  $('weapon-preset-status').textContent=!ready
   ?'Привяжи оружие к кости и выбери анимацию'
   :weaponDirty?'● Изменено — запомнится при переключении / экспорте'
