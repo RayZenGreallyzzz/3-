@@ -464,6 +464,7 @@ function setTime(t) {
   state.mixer.update(0);armPose.apply();
   applyCurrentWeapon();
   refreshAnimationTime();
+  refreshFields();
   refreshExport();
 }
 function playPause() {
@@ -983,7 +984,7 @@ function animate(){
     state.time=state.action.time;
     applyCurrentWeapon();
     displayAcc += delta;
-    if(displayAcc>=.06) {refreshAnimationTime();refreshExport();displayAcc=0;}
+    if(displayAcc>=.06) {refreshAnimationTime();refreshFields();refreshExport();displayAcc=0;}
   } else if(state.weapon?.parent?.isBone) {
     displayAcc+=delta;if(displayAcc>=.1){refreshExport();displayAcc=0;}
   }
