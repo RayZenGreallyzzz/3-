@@ -10,7 +10,12 @@ import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { ArmPoseController, POSE_LIMITS, POSE_LABELS, resolveArmBones, identifyArmBone, bakePoseClips } from './arm-pose.js';
+import { ArmPoseController, POSE_LIMITS, POSE_LABELS, resolveArmBones, identifyArmBone, bakePoseClipsByIndex, cloneArmOffsets } from './arm-pose.js';
+import {WeaponAnimationProfiles,bakeWeaponAnimationClips} from './weapon-profiles.js';
+import {bakeWeaponMotionClips} from './weapon-motion.js';
+import {WeaponMotionEditor} from './weapon-motion-editor.js';
+import {assertSavedWeaponMotion} from './weapon-export-verify.js';
+import {setupStudioHelp} from './studio-help.js';
 import './style.css';
 
 const NativeFileSaver = registerPlugin('NativeFileSaver');
@@ -58,14 +63,63 @@ transform.setSize(.85);
 transform.setMode('translate');
 transform.setSpace('local');
 transform.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; });
-transform.addEventListener('objectChange', () => { refreshFields(); refreshExport(); });
+transform.addEventListener('objectChange', () => {markWeaponDirty();refreshFields();refreshExport();});
 const state = { character: null, weapon: null, bones: [], selectedBone: null, skeletonHelper: null,
   mixer: null, clips: [], action: null, clip: null, playing: false, time: 0,
   characterName: null, weaponName: null, modelUrls: [], toastTimer: null,
   gizmoVisible: true, exporting: false, poseSide: 'right', poseJoint: 'upper',
   poseArmBones: {left:{},right:{}}, poseManualBone: null };
 const armPose = new ArmPoseController();
+const weaponProfiles=new WeaponAnimationProfiles();
+const armCorrections=new Map();
+let weaponDirty=false;
+const currentClipIndex=()=>state.clip?state.clips.indexOf(state.clip):-1;
+function refreshWeaponPresetUI(){
+ const i=currentClipIndex(),ready=Boolean(state.weapon?.parent?.isBone&&i>=0);
+ $('save-weapon-clip').disabled=!ready||state.exporting;
+ $('reset-weapon-clip').disabled=!ready||state.exporting;
+ $('weapon-preset-status').textContent=!ready
+  ?'Привяжи оружие к кости и выбери анимацию'
+  :weaponDirty?'● Изменено — запомнится при переключении / экспорте'
+  :weaponProfiles.has(i)?'✓ Для этой анимации есть сохранённая позиция'
+  :'Используется исходная позиция. Настрой оружие и нажми «Запомнить».';
+}
+function markWeaponDirty(){
+ if(!state.weapon?.parent?.isBone)return;
+ weaponDirty=true;refreshWeaponPresetUI();
+}
+function commitWeapon(){
+ const i=currentClipIndex();
+ if(i<0||!state.weapon?.parent?.isBone)return false;
+ const ok=weaponProfiles.save(i,state.weapon);
+ if(ok){weaponDirty=false;refreshWeaponPresetUI();}
+ return ok;
+}
+function rememberArms(){
+ const i=currentClipIndex();if(i<0)return;
+ if(armPose.offsets.size)armCorrections.set(i,cloneArmOffsets(armPose.offsets));
+ else armCorrections.delete(i);
+}
+function loadArms(i){
+ armPose.clearAll();
+ const saved=armCorrections.get(i);
+ if(saved?.size){armPose.offsets=cloneArmOffsets(saved);armPose.apply();}
+}
 
+const weaponMotionEditor=new WeaponMotionEditor({
+ getWeapon:()=>state.weapon,getBones:()=>state.bones,
+ getSelectedBone:()=>state.selectedBone,getClipIndex:currentClipIndex,
+ getTime:()=>state.time,setTime:t=>setTime(t),
+ isExporting:()=>state.exporting,isDirty:()=>weaponDirty,
+ markDirty:()=>markWeaponDirty(),
+ clearDirty:()=>{weaponDirty=false;refreshWeaponPresetUI();},
+ refresh:()=>{refreshFields();refreshExport();},
+ notify:message=>toast(message)
+});
+function applyCurrentWeapon(){
+ if(weaponDirty)return;
+ if(!weaponMotionEditor.preview())weaponProfiles.apply(currentClipIndex(),state.weapon);
+}
 function toast(message) {
   const t = $('toast');
   t.textContent = message;
@@ -95,6 +149,8 @@ function refreshModelActions() {
   $('model-badge').textContent = state.characterName || state.weaponName || 'Сцена пуста';
   $('empty-state').classList.toggle('hidden', !!(state.character || state.weapon));
   refreshPoseUI();
+  refreshWeaponPresetUI();
+  weaponMotionEditor.render();
 }
 function syncGizmoVisibility() {
   const enabled = !!state.weapon && state.gizmoVisible;
@@ -114,7 +170,7 @@ function resetCharacter() {
   if (state.weapon?.parent && state.weapon.parent !== scene) scene.attach(state.weapon);
   if (state.mixer) { state.mixer.stopAllAction(); state.mixer.uncacheRoot(state.character); }
   if (state.skeletonHelper) { scene.remove(state.skeletonHelper); state.skeletonHelper.geometry.dispose(); state.skeletonHelper.material.dispose(); }
-  armPose.clearAll();
+  armPose.clearAll();armCorrections.clear();weaponProfiles.clear();weaponMotionEditor.reset();weaponDirty=false;
   if (state.character) { scene.remove(state.character); disposeObject(state.character); }
   Object.assign(state, {character:null,bones:[],selectedBone:null,skeletonHelper:null,mixer:null,clips:[],action:null,clip:null,playing:false,time:0,characterName:null,
     poseArmBones:{left:{},right:{}},poseManualBone:null});
@@ -129,7 +185,7 @@ function resetWeapon() {
   transform.detach();
   if (state.weapon) { state.weapon.removeFromParent(); disposeObject(state.weapon); }
   state.weapon = null;
-  state.weaponName = null;
+  state.weaponName = null;weaponProfiles.clear();weaponMotionEditor.reset();weaponDirty=false;
   $('weapon-file').textContent = 'Загрузить';
   refreshFields(); refreshExport();
   refreshModelActions();
@@ -263,7 +319,7 @@ function renderBones() {
     const name = document.createElement('span'); name.textContent = bone.name || '(без имени)';
     const index = document.createElement('small'); index.textContent = '#'+(state.bones.indexOf(bone)+1);
     row.append(name,index);
-    row.addEventListener('click', () => { state.selectedBone = bone; renderBones(); toast('Кость выбрана: '+bone.name); });
+    row.addEventListener('click', () => { state.selectedBone = bone; renderBones(); weaponMotionEditor.render(); toast('Кость выбрана: '+bone.name); });
     list.append(row);
   });
 }
@@ -309,6 +365,9 @@ async function importModel(kind, files) {
       if (embeddedWeapon) {
         if (state.weapon) resetWeapon();
         state.weapon = embeddedWeapon;
+        weaponProfiles.load(embeddedWeapon,embeddedWeapon.userData?.rigWeaponStudioWeaponProfiles);
+        weaponMotionEditor.load(embeddedWeapon.userData?.rigWeaponStudioMotionKeys);
+        weaponDirty=false;
         state.weaponName = embeddedWeapon.name || 'Оружие из GLB';
         $('weapon-file').textContent = state.weaponName;
         transform.attach(state.weapon);
@@ -338,6 +397,7 @@ async function importModel(kind, files) {
     } else {
       resetWeapon();
       state.weapon = loaded.root;
+      weaponProfiles.clear();weaponMotionEditor.reset();weaponDirty=false;
       state.weaponName = loaded.name;
       scene.add(state.weapon);
       // Put a new weapon near the origin; never silently change its scale.
@@ -376,6 +436,7 @@ function updateAnimationList() {
 }
 function selectClip(index) {
   if (!state.mixer || !state.clips[index]) return;
+  if(weaponDirty)commitWeapon();rememberArms();armPose.restore();
   state.mixer.stopAllAction();
   state.clip = state.clips[index];
   state.action = state.mixer.clipAction(state.clip);
@@ -384,9 +445,9 @@ function selectClip(index) {
   state.action.timeScale = Number($('animation-speed').value);
   state.playing = false;
   state.time = 0;
-  armPose.restore();
-  state.mixer.update(0);
-  armPose.apply();
+  loadArms(index);armPose.restore();state.mixer.update(0);armPose.apply();
+  weaponDirty=false;applyCurrentWeapon();weaponMotionEditor.render();
+  refreshWeaponPresetUI();refreshPoseUI();refreshFields();
   $('animation-play').textContent = '▶';
   $('animation-seek').value = '0';
   refreshAnimationTime();
@@ -401,9 +462,10 @@ function setTime(t) {
   state.time = THREE.MathUtils.clamp(t,0,state.clip.duration);
   state.action.time = state.time;
   armPose.restore();
-  state.mixer.update(0);
-  armPose.apply();
+  state.mixer.update(0);armPose.apply();
+  applyCurrentWeapon();
   refreshAnimationTime();
+  refreshFields();
   refreshExport();
 }
 function playPause() {
@@ -422,6 +484,7 @@ function attachWeapon() {
   if (!state.selectedBone) return toast('Выбери кость руки в списке');
   state.selectedBone.updateWorldMatrix(true,true);
   state.selectedBone.attach(state.weapon); // preserve world transform at current pose
+  weaponProfiles.attach(state.weapon);weaponMotionEditor.reset();weaponDirty=false;refreshWeaponPresetUI();weaponMotionEditor.render();
   transform.attach(state.weapon);
   setGizmoVisible(false);
   refreshFields(); refreshExport();
@@ -430,6 +493,7 @@ function attachWeapon() {
 function detachWeapon() {
   if (!state.weapon) return toast('Сначала загрузи оружие');
   scene.attach(state.weapon); // world position remains fixed at current pose
+  weaponProfiles.clear();weaponMotionEditor.reset();weaponDirty=false;refreshWeaponPresetUI();weaponMotionEditor.render();
   transform.attach(state.weapon);
   refreshFields(); refreshExport();
   toast('Оружие отвязано, мировое положение сохранено');
@@ -516,8 +580,7 @@ function readFields() {
   o.position.set(get('px',o.position.x),get('py',o.position.y),get('pz',o.position.z));
   o.rotation.set(THREE.MathUtils.degToRad(get('rx',0)),THREE.MathUtils.degToRad(get('ry',0)),THREE.MathUtils.degToRad(get('rz',0)));
   o.scale.set(get('sx',1),get('sy',1),get('sz',1));
-  o.updateMatrixWorld(true);
-  refreshExport();
+  o.updateMatrixWorld(true);markWeaponDirty();refreshExport();
 }
 function transformInfo() {
   if (!state.weapon) return null;
@@ -565,7 +628,8 @@ splash.innerHTML=`
     <div class="start-art-wrap"><img class="start-art" src="/panda-menu.webp" alt="Неоновый талисман приложения — сердитый зверёк в кепке"/></div>
     <div class="start-buttons"><button class="btn primary" id="start-character"><span class="btn-ico">◈</span> Загрузить персонажа <span>→</span></button>
     <button class="btn subtle" id="start-weapon"><span class="btn-ico">⚔</span> Загрузить оружие <span>→</span></button>
-    <button class="btn subtle" id="start-demo"><span class="btn-ico">◉</span> Открыть пустую сцену <span>→</span></button></div>
+    <button class="btn subtle" id="start-demo"><span class="btn-ico">◉</span> Открыть пустую сцену <span>→</span></button>
+    <button class="btn subtle" type="button" id="start-help"><span class="btn-ico">❔</span> Пошаговая инструкция <span>→</span></button></div>
     <div class="start-divider">РЕДАКТОР ПОДДЕРЖИВАЕТ</div>
     <div class="start-features"><span>GLB · GLTF · FBX</span><span>OBJ · DAE · STL · PLY</span><span>Скелет и анимации</span></div>
     <div class="start-bottom">PERSONAL 3D EDITOR · ANDROID & DESKTOP</div>
@@ -639,13 +703,23 @@ button('pose-reset-arm', () => {
 button('reset-weapon',()=> {
   if(!state.weapon)return toast('Сначала загрузи оружие');
   state.weapon.position.set(0,0,0);state.weapon.rotation.set(0,0,0);state.weapon.scale.set(1,1,1);
-  refreshFields();refreshExport();
+    markWeaponDirty();refreshFields();refreshExport();
 });
 $('bone-search').addEventListener('input',renderBones);
 $('animation-select').addEventListener('change',event=>selectClip(Number(event.target.value)));
 button('animation-play',playPause);
 button('animation-stop',stopAnimation);
 button('animation-start',()=> {stopAnimation();});
+button('save-weapon-clip',()=>{
+ if(!commitWeapon())return toast('Сначала привяжи оружие к кости и выбери анимацию.');
+ toast('✓ Положение оружия сохранено для «'+state.clip.name+'»');
+});
+button('reset-weapon-clip',()=>{
+ const i=currentClipIndex();if(i<0||!state.weapon?.parent?.isBone)return;
+ weaponProfiles.reset(i,state.weapon);weaponDirty=false;
+ refreshFields();refreshExport();refreshWeaponPresetUI();
+ toast('Исходная позиция восстановлена только для этого действия');
+});
 $('animation-speed').addEventListener('change',()=> {if(state.action)state.action.timeScale=Number($('animation-speed').value);});
 $('animation-seek').addEventListener('input',event=> {if (state.clip)setTime(state.clip.duration*(Number(event.target.value)/1000));});
 for (const modeButton of document.querySelectorAll('[data-mode]')) {
@@ -760,6 +834,7 @@ function showExportStatus(message) {
 async function exportSceneGLB() {
   if (state.exporting) return;
   if (!state.character && !state.weapon) return toast('Сначала загрузи персонажа или оружие');
+  if(weaponDirty)commitWeapon();rememberArms();
   state.exporting = true;
   const btn = $('export-glb');
   btn.disabled = true;
@@ -773,7 +848,7 @@ async function exportSceneGLB() {
   const exportWeapon = state.weapon;
   // glTF extras survive reload. They identify the weapon separately from
   // the character so it can be edited again in another Rig & Weapon session.
-  if (exportWeapon) exportWeapon.userData.rigWeaponStudioRole = 'weapon';
+  if (exportWeapon){exportWeapon.userData.rigWeaponStudioRole = 'weapon';exportWeapon.userData.rigWeaponStudioWeaponProfiles=weaponProfiles.toJSON();exportWeapon.userData.rigWeaponStudioMotionKeys=weaponMotionEditor.toJSON();}
   const detachedWeapon = exportWeapon && (!exportCharacter || !exportCharacter.getObjectById(exportWeapon.id));
   const playingBeforeSave = state.playing;
   if (state.action) state.action.paused = true;
@@ -793,8 +868,11 @@ async function exportSceneGLB() {
     objectsInExportScene = true;
     exportScene.updateMatrixWorld(true);
     const exporter = new GLTFExporter();
-    const processed = bakePoseClips(state.clips, armPose.offsets);
-    const animationsForExport = exportCharacter ? processed.clips : [];
+    const processed=bakePoseClipsByIndex(state.clips,armCorrections);
+    const weaponClips=bakeWeaponAnimationClips(processed.clips,exportWeapon,weaponProfiles);
+    const motionBake=bakeWeaponMotionClips(weaponClips.clips,exportWeapon,exportCharacter,weaponMotionEditor.library);
+    if(motionBake.missing.length)throw Error('Не найдены кости для анимаций: '+motionBake.missing.join(', '));
+    const animationsForExport=exportCharacter?motionBake.clips:[];
     let result;
     let missingAnimations = false;
     try {
@@ -803,9 +881,10 @@ async function exportSceneGLB() {
         animations: animationsForExport
       });
     } catch (animationError) {
-      // Some FBX animation tracks cannot be represented by glTF.
-      // Still allow export of the character with its attached weapon,
-      // but warn clearly that its animations were not included.
+      // Never pretend to save weapon motion when the GLB exporter dropped
+      // action tracks. The user needs ALL weapon positions per animation.
+      if (exportWeapon?.parent?.isBone && state.clips.length)
+        throw new Error('GLB не смог записать анимации оружия: '+(animationError?.message||String(animationError)));
       if (!state.clips.length) throw animationError;
       console.warn('Animation export failed, retry without clips:', animationError);
       result = await new GLTFExporter().parseAsync(exportScene, {
@@ -815,6 +894,9 @@ async function exportSceneGLB() {
     }
     restoreExportScene();
     const gltf = verifyGlbBuffer(result);
+    assertSavedWeaponMotion(gltf,missingAnimations?0:animationsForExport.length,{
+      weaponExpected:Boolean(exportWeapon?.parent?.isBone&&!missingAnimations)
+    });
     const nodes = gltf.nodes || [];
     if (exportCharacter && !nodes.some(n => n.name === exportCharacter.name))
       console.warn('Character root group not named in export; model nodes:', nodes.length);
@@ -902,8 +984,9 @@ function animate(){
     state.mixer.update(delta);
     armPose.apply();
     state.time=state.action.time;
+    applyCurrentWeapon();
     displayAcc += delta;
-    if(displayAcc>=.06) {refreshAnimationTime();refreshExport();displayAcc=0;}
+    if(displayAcc>=.06) {refreshAnimationTime();refreshFields();refreshExport();displayAcc=0;}
   } else if(state.weapon?.parent?.isBone) {
     displayAcc+=delta;if(displayAcc>=.1){refreshExport();displayAcc=0;}
   }
@@ -914,3 +997,17 @@ animate();
 refreshFields();refreshExport();
 refreshModelActions();
 refreshPoseUI();
+setupStudioHelp({
+ getStatus:()=>[
+  state.character?'✓ Персонаж загружен':'○ Персонаж не загружен',
+  state.bones.length?'✓ Скелет: '+state.bones.length+' костей':'○ Нет костей',
+  state.weapon?'✓ Оружие загружено':'○ Нет оружия',
+  state.weapon?.parent?.isBone?'✓ Оружие привязано к '+state.weapon.parent.name:'○ Оружие не привязано к кости',
+  state.clip?'✓ Анимация: '+state.clip.name:'○ Анимация не выбрана'
+ ].join(' · '),
+ onNavigate:()=>{
+  // Visiting a control from the splash opens the existing editor only.
+  // No model, animation key, or weapon transform is modified.
+  showEditor();
+ }
+});

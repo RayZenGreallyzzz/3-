@@ -125,3 +125,22 @@ export function bakePoseClips(clips, offsets) {
   });
   return { clips: output, modified, skipped };
 }
+
+
+// Keep arm corrections for each clip separately. Applying one Attack grip
+// must never contaminate Idle/Run/Death.
+export function cloneArmOffsets(offsets){
+ return new Map([...offsets].map(([bone,angles])=>[bone,{...angles}]));
+}
+export function bakePoseClipsByIndex(clips,offsetsByIndex){
+ let modified=0,skipped=0;
+ const output=clips.map((clip,index)=>{
+  const offsets=offsetsByIndex.get(index);
+  if(!offsets?.size)return clip;
+  const result=bakePoseClips([clip],offsets);
+  modified+=result.modified;
+  skipped+=result.skipped;
+  return result.clips[0];
+ });
+ return {clips:output,modified,skipped};
+}
