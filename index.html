@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/><meta name="theme-color" content="#111625"/><link rel="icon" type="image/png" href="/panda-icon.png"/><title>Rig & Weapon Studio</title></head><body>
 <div id="app">
-<header class="topbar"><div class="brand"><span class="brand-icon"><img src="/panda-icon.png" alt="Иконка"/></span><div><strong>RIG <em>&</em> WEAPON</strong><small>3D STUDIO · v0.5</small></div></div><div class="top-actions"><span id="model-badge">Сцена пуста</span><button id="reset-camera" class="btn subtle">⌖ Камера</button></div></header>
+<header class="topbar"><div class="brand"><span class="brand-icon"><img src="/panda-icon.png" alt="Иконка"/></span><div><strong>RIG <em>&</em> WEAPON</strong><small>3D STUDIO · v0.6</small></div></div><div class="top-actions"><span id="model-badge">Сцена пуста</span><button id="reset-camera" class="btn subtle">⌖ Камера</button></div></header>
 <div class="workspace">
  <div class="viewport-col">
   <div id="viewport" aria-label="Область просмотра 3D-моделей"><div id="empty-state"><div class="empty-graphic">⬡</div><h2>Загрузи персонажа</h2><p>GLB · GLTF · FBX · OBJ · DAE · STL · PLY</p><button class="btn primary" id="empty-load">＋ Выбрать модель</button><p class="hint">Перетяни файлы сюда или выбери из памяти телефона</p></div><div class="viewport-status"><span id="fps-label">Сцена готова</span><span id="view-mode">Perspective</span></div><div class="view-tools"><button id="wide-toggle" title="Развернуть 3D-сцену" aria-label="Развернуть 3D-сцену" class="tool">⛶</button><button id="grid-toggle" title="Сетка" class="tool active">▦</button><button id="bone-toggle" title="Скелет" class="tool">♧</button><button id="frame-camera" title="Вписать в кадр" class="tool">⛶</button></div></div>
@@ -16,7 +16,26 @@
   <div class="fieldgroup"><div class="field-title">ПОЗИЦИЯ</div><div class="axis-grid"><label class="x-axis">X<input id="px" type="number" step="0.001" value="0"/></label><label class="y-axis">Y<input id="py" type="number" step="0.001" value="0"/></label><label class="z-axis">Z<input id="pz" type="number" step="0.001" value="0"/></label></div></div>
   <div class="fieldgroup"><div class="field-title">ПОВОРОТ (ГРАДУСЫ)</div><div class="axis-grid"><label class="x-axis">X<input id="rx" type="number" step="0.1" value="0"/></label><label class="y-axis">Y<input id="ry" type="number" step="0.1" value="0"/></label><label class="z-axis">Z<input id="rz" type="number" step="0.1" value="0"/></label></div></div>
   <div class="fieldgroup"><div class="field-title">МАСШТАБ</div><div class="axis-grid"><label class="x-axis">X<input id="sx" type="number" step="0.01" value="1"/></label><label class="y-axis">Y<input id="sy" type="number" step="0.01" value="1"/></label><label class="z-axis">Z<input id="sz" type="number" step="0.01" value="1"/></label></div></div>
-  <div class="precision-row"><label><input type="checkbox" id="snap-toggle"/> Привязка к шагу</label><button id="reset-weapon" class="btn subtle">Сброс</button></div></section>
+  <div class="precision-row"><label><input type="checkbox" id="snap-toggle"/> Привязка к шагу</label><button id="reset-weapon" class="btn subtle">Сброс</button></div>
+  <div class="weapon-motion-editor">
+    <strong>Ключи крепления · доставание оружия</strong>
+    <p class="smallmuted">Выбери кадр на шкале анимации, укажи кость (кисть, позвоночник или таз), поставь оружие на нужное место и сохрани ключ. Между ключами оружие плавно перемещается, а до и после перехода следует выбранной кости.</p>
+    <label>Точка крепления
+      <select id="weapon-motion-anchor" aria-label="Точка крепления для ключа">
+        <option value="hand">✋ Рука</option>
+        <option value="back">⚔ Спина (позвоночник)</option>
+        <option value="waist">◇ Пояс (таз)</option>
+        <option value="selected">▣ Выбранная кость</option>
+      </select>
+    </label>
+    <span class="smallmuted" id="weapon-motion-anchor-name">Кость не выбрана</span>
+    <div class="weapon-motion-actions">
+      <button type="button" class="btn subtle" id="weapon-motion-place" disabled>◎ Поставить у кости</button>
+      <button type="button" class="btn primary" id="weapon-motion-record" disabled>＋ Ключ на этом кадре</button>
+    </div>
+    <div id="weapon-motion-keys" class="weapon-motion-keys" aria-label="Ключи крепления по времени">Нет ключей крепления</div>
+  </div>
+  </section>
   <section class="panel arm-pose-panel"><div class="panel-title"><span class="step">04</span><h3>Поза рук</h3><span class="muted">ПОПРАВКА</span></div>
   <div class="pose-segment" role="group" aria-label="Выбор руки"><button type="button" data-pose-side="left">◀ Левая рука</button><button type="button" data-pose-side="right" class="selected">Правая рука ▶</button></div>
   <div class="pose-joints" role="group" aria-label="Выбор сустава"><button type="button" data-pose-joint="clavicle">Ключица</button><button type="button" data-pose-joint="upper" class="selected">Плечо</button><button type="button" data-pose-joint="forearm">Локоть</button><button type="button" data-pose-joint="hand">Кисть</button></div>
