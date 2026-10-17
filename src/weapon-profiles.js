@@ -92,7 +92,9 @@ export function bakeWeaponAnimationClips(clips,weapon,profiles){
    new THREE.VectorKeyframeTrack(boundId+'.scale',times,append(p.scale))
   ];
   count++;
-  return new THREE.AnimationClip(clip.name,clip.duration,[...old,...tracks]);
+  const saved=clip.clone();
+  saved.tracks=[...old,...tracks];
+  return saved;
  });
  return {clips:output,modified:count};
 }
