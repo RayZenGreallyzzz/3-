@@ -77,7 +77,6 @@ function refreshWeaponPresetUI(){
  const i=currentClipIndex(),ready=Boolean(state.weapon?.parent?.isBone&&i>=0);
  $('save-weapon-clip').disabled=!ready||state.exporting;
  $('reset-weapon-clip').disabled=!ready||state.exporting;
- weaponMotionEditor.render();
  $('weapon-preset-status').textContent=!ready
   ?'Привяжи оружие к кости и выбери анимацию'
   :weaponDirty?'● Изменено — запомнится при переключении / экспорте'
@@ -483,7 +482,7 @@ function attachWeapon() {
   if (!state.selectedBone) return toast('Выбери кость руки в списке');
   state.selectedBone.updateWorldMatrix(true,true);
   state.selectedBone.attach(state.weapon); // preserve world transform at current pose
-  weaponProfiles.attach(state.weapon);weaponMotionEditor.reset();weaponDirty=false;refreshWeaponPresetUI();
+  weaponProfiles.attach(state.weapon);weaponMotionEditor.reset();weaponDirty=false;refreshWeaponPresetUI();weaponMotionEditor.render();
   transform.attach(state.weapon);
   setGizmoVisible(false);
   refreshFields(); refreshExport();
@@ -492,7 +491,7 @@ function attachWeapon() {
 function detachWeapon() {
   if (!state.weapon) return toast('Сначала загрузи оружие');
   scene.attach(state.weapon); // world position remains fixed at current pose
-  weaponProfiles.clear();weaponMotionEditor.reset();weaponDirty=false;refreshWeaponPresetUI();
+  weaponProfiles.clear();weaponMotionEditor.reset();weaponDirty=false;refreshWeaponPresetUI();weaponMotionEditor.render();
   transform.attach(state.weapon);
   refreshFields(); refreshExport();
   toast('Оружие отвязано, мировое положение сохранено');
