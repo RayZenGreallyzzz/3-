@@ -121,7 +121,7 @@ export function bakeWeaponMotionClips(clips,weapon,character,motion,{fps=30,maxS
  const bones=[];
  character.traverse(o=>{if(o.isBone)bones.push(o);});
  const lookup=new Map(bones.map(b=>[b.name,b]));
- const saved=character.children.length?new Map():new Map();
+ const saved=new Map();
  character.traverse(o=>{if(o.isObject3D)saved.set(o,{position:o.position.clone(),quaternion:o.quaternion.clone(),scale:o.scale.clone()});});
  const out=[],missing=[];let modified=0;
  const restore=()=>{
