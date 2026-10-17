@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/><meta name="theme-color" content="#111625"/><link rel="icon" type="image/png" href="/panda-icon.png"/><title>Rig & Weapon Studio</title></head><body>
 <div id="app">
-<header class="topbar"><div class="brand"><span class="brand-icon"><img src="/panda-icon.png" alt="Иконка"/></span><div><strong>RIG <em>&</em> WEAPON</strong><small>3D STUDIO · v0.6</small></div></div><div class="top-actions"><span id="model-badge">Сцена пуста</span><button id="reset-camera" class="btn subtle">⌖ Камера</button></div></header>
+<header class="topbar"><div class="brand"><span class="brand-icon"><img src="/panda-icon.png" alt="Иконка"/></span><div><strong>RIG <em>&</em> WEAPON</strong><small>3D STUDIO · v0.6</small></div></div><div class="top-actions"><span id="model-badge">Сцена пуста</span><button id="reset-camera" class="btn subtle">⌖ Камера</button><button id="open-studio-help" class="btn subtle studio-help-open" type="button" aria-haspopup="dialog" aria-controls="studio-help-modal">❔ Инструкция</button></div></header>
 <div class="workspace">
  <div class="viewport-col">
   <div id="viewport" aria-label="Область просмотра 3D-моделей"><div id="empty-state"><div class="empty-graphic">⬡</div><h2>Загрузи персонажа</h2><p>GLB · GLTF · FBX · OBJ · DAE · STL · PLY</p><button class="btn primary" id="empty-load">＋ Выбрать модель</button><p class="hint">Перетяни файлы сюда или выбери из памяти телефона</p></div><div class="viewport-status"><span id="fps-label">Сцена готова</span><span id="view-mode">Perspective</span></div><div class="view-tools"><button id="wide-toggle" title="Развернуть 3D-сцену" aria-label="Развернуть 3D-сцену" class="tool">⛶</button><button id="grid-toggle" title="Сетка" class="tool active">▦</button><button id="bone-toggle" title="Скелет" class="tool">♧</button><button id="frame-camera" title="Вписать в кадр" class="tool">⛶</button></div></div>
-  <div class="transport"><div class="transport-top"><div class="section-mini">АНИМАЦИЯ</div><select id="animation-select" aria-label="Выбрать анимацию"><option value="">Нет анимаций</option></select><span id="animation-time">0.000 / 0.000 c</span></div><div class="weapon-clip-preset"><div class="weapon-preset-copy"><strong>Положение оружия для текущей анимации</strong><span id="weapon-preset-status">Позиция пока не сохранена</span></div><button class="btn primary" id="save-weapon-clip" type="button" disabled>✓ Запомнить положение</button><button class="btn subtle" id="reset-weapon-clip" type="button" disabled>↺ Вернуть исходное</button></div>
+  <div class="transport"><div class="transport-top"><div class="section-mini">АНИМАЦИЯ</div><select id="animation-select" aria-label="Выбрать анимацию"><option value="">Нет анимаций</option></select><span id="animation-time">0.000 / 0.000 c</span></div><div class="weapon-clip-preset"><div class="weapon-preset-copy"><strong>Постоянное положение для выбранной анимации</strong><span id="weapon-preset-status">Позиция пока не сохранена</span></div><button class="btn primary" id="save-weapon-clip" type="button" disabled>✓ Запомнить положение</button><button class="btn subtle" id="reset-weapon-clip" type="button" disabled>↺ Вернуть исходное</button></div>
   <div class="transport-bottom"><button class="btn icon" id="animation-start" title="На начало">⏮</button><button class="btn icon accent" id="animation-play" title="Воспроизвести / пауза">▶</button><button class="btn icon" id="animation-stop" title="Остановить">■</button><input type="range" id="animation-seek" min="0" max="1000" value="0" step="1" aria-label="Перемотка по времени"/><label class="speed">Скорость <select id="animation-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div></div>
  </div>
  <aside class="sidebar">
@@ -18,8 +18,8 @@
   <div class="fieldgroup"><div class="field-title">МАСШТАБ</div><div class="axis-grid"><label class="x-axis">X<input id="sx" type="number" step="0.01" value="1"/></label><label class="y-axis">Y<input id="sy" type="number" step="0.01" value="1"/></label><label class="z-axis">Z<input id="sz" type="number" step="0.01" value="1"/></label></div></div>
   <div class="precision-row"><label><input type="checkbox" id="snap-toggle"/> Привязка к шагу</label><button id="reset-weapon" class="btn subtle">Сброс</button></div>
   <div class="weapon-motion-editor">
-    <strong>Ключи крепления · доставание оружия</strong>
-    <p class="smallmuted">Выбери кадр на шкале анимации, укажи кость (кисть, позвоночник или таз), поставь оружие на нужное место и сохрани ключ. Между ключами оружие плавно перемещается, а до и после перехода следует выбранной кости.</p>
+    <strong>Доставание / убирание оружия по кадрам</strong><button type="button" class="studio-help-context btn subtle" data-open-studio-help="motion">❔ Как записать переход?</button>
+    <p class="smallmuted">Это НЕ кнопка «Запомнить положение» выше. Здесь нужны минимум два ключа В ОДНОЙ анимации: первый — спина/пояс, второй — рука. Выбери время, точку крепления, поставь оружие возле кости, вручную поправь его и нажми «Ключ на этом кадре».</p>
     <label>Точка крепления
       <select id="weapon-motion-anchor" aria-label="Точка крепления для ключа">
         <option value="hand">✋ Рука</option>
@@ -55,6 +55,76 @@
  </aside>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="studio-help-modal" class="studio-help-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="studio-help-title">
+  <div class="studio-help-panel">
+    <header class="studio-help-head">
+      <div><small>RIG & WEAPON STUDIO</small><h2 id="studio-help-title">❔ Как пользоваться студией</h2></div>
+      <button id="close-studio-help" type="button" class="studio-help-close btn subtle" aria-label="Закрыть инструкцию">✕</button>
+    </header>
+    <nav class="studio-help-tabs" aria-label="Разделы инструкции">
+      <button type="button" data-help-tab="basics" class="selected" aria-selected="true">01 · Начать</button>
+      <button type="button" data-help-tab="clips" aria-selected="false">02 · Разные анимации</button>
+      <button type="button" data-help-tab="motion" aria-selected="false">03 · Достать меч</button>
+      <button type="button" data-help-tab="issues" aria-selected="false">04 · Если не работает</button>
+    </nav>
+    <div id="studio-help-body" class="studio-help-body" tabindex="-1">
+      <div class="studio-help-topic" data-help-section="basics">
+        <h3>Персонаж и оружие — первый запуск</h3>
+        <p>Работает полностью на устройстве. Нужен персонаж <b>с костями и готовыми анимациями</b> (лучше GLB) и отдельная модель оружия. Студия не создаёт автоматически анимацию руки, которая тянется за мечом.</p>
+        <ol class="studio-help-steps">
+          <li><b>Загрузи персонажа</b> со скелетом и анимациями. Если список костей пустой — эту модель сначала нужно заригить. <button type="button" data-help-target="character-load">Показать загрузку персонажа ↗</button></li>
+          <li><b>Загрузи оружие</b> отдельным файлом. <button type="button" data-help-target="weapon-load">Показать загрузку оружия ↗</button></li>
+          <li><b>Выбери кость кисти</b> в разделе «Привязка к скелету» (обычно RightHand / LeftHand), нажми «Привязать». Оружие теперь будет двигаться вслед за выбранной рукой. <button type="button" data-help-target="attach-weapon">Где кнопка «Привязать»? ↗</button></li>
+          <li><b>Поставь меч в руке:</b> выбери режим «Позиция» / «Поворот», используй стрелки или числа X/Y/Z. Если стрелки скрыты, нажми «Показать стрелки». <button type="button" data-help-target="gizmo-toggle">Показать настройки ↗</button></li>
+          <li><b>Выбери способ сохранения</b>: для одной позиции на каждую анимацию — «Запомнить положение»; для доставания по кадрам — вкладка «Достать меч».</li>
+        </ol>
+        <p class="studio-help-note">Совет: сначала проверь на персонаже только с Idle и Attack. Не нажимай «Сброс» без необходимости — это сбрасывает координаты оружия.</p>
+      </div>
+      <div class="studio-help-topic" data-help-section="clips" hidden>
+        <h3>Разные положения меча для Idle, Run и Attack</h3>
+        <p>Этот режим сохраняет <b>одну неизменную локальную позицию на каждую анимацию</b>. Для изменения позиции В СЕРЕДИНЕ анимации используй раздел «Достать меч».</p>
+        <ol class="studio-help-steps">
+          <li>В выпадающем списке выбери <b>Idle</b>. <button type="button" data-help-target="animation-select">Открыть выбор анимации ↗</button></li>
+          <li>Поверни и передвинь меч в нужное место, нажми <b>«✓ Запомнить положение»</b>. <button type="button" data-help-target="save-weapon-clip">Где сохранить? ↗</button></li>
+          <li>Переключись на <b>Attack</b>, выстави другой захват и снова нажми «Запомнить положение».</li>
+          <li>Вернись на Idle и Attack по очереди: программа должна восстановить разные настройки для каждого клипа.</li>
+          <li>Нажми <b>«Сохранить GLB»</b> и проверь файл повторной загрузкой. <button type="button" data-help-target="export-glb">Перейти к экспорту ↗</button></li>
+        </ol>
+        <p class="studio-help-note">Важно: просто перенести меч на спину при Idle недостаточно для красивого доставания. Во время DrawWeapon нужны отдельные ключи и заранее существующее движение руки.</p>
+      </div>
+      <div class="studio-help-topic" data-help-section="motion" hidden>
+        <h3>Достать меч со спины или пояса</h3>
+        <p>Используй <b>одну анимацию DrawWeapon</b>, в которой рука уже движется к оружию. Для убирания обратно нужен клип SheatheWeapon или другое подходящее движение персонажа.</p>
+        <ol class="studio-help-steps">
+          <li><b>Выбери DrawWeapon</b> в списке анимаций и останови воспроизведение. Перемотай шкалу в <b>0.00 с</b>. <button type="button" data-help-target="animation-seek">Перейти к шкале ↗</button></li>
+          <li>В разделе <b>«Доставание / убирание»</b> выбери <b>«Спина»</b> или <b>«Пояс»</b>. Кнопка <b>«◎ Поставить у кости»</b> переместит меч только приблизительно. <button type="button" data-help-target="weapon-motion-anchor">Показать точку ↗</button></li>
+          <li>Стрелками и поворотом вручную поставь меч как он должен висеть в ножнах. Нажми <b>«＋ Ключ на этом кадре»</b>. <button type="button" data-help-target="weapon-motion-record">Показать запись ключа ↗</button></li>
+          <li>Перемотай, например, на <b>0.70 с</b>, где рука уже захватила меч. Выбери <b>«Рука»</b> → <b>«Поставить у кости»</b> → поправь рукоять вручную → <b>«Ключ на этом кадре»</b>.</li>
+          <li>Нажми «▶» и проверь переход: между ключами меч плавно перемещается, после последнего — следует кисти. При необходимости добавь промежуточные ключи (например, 0.35 с). <button type="button" data-help-target="animation-play">Где воспроизведение? ↗</button></li>
+          <li>Для <b>SheatheWeapon</b> сделай обратный путь: «Рука» в начале, «Спина» или «Пояс» в конце. Затем экспортируй GLB.</li>
+        </ol>
+        <p class="studio-help-note">⚠ Не нужно физически перепривязывать меч кнопкой «Привязать» на каждом ключе! Выбери кость руки один раз. Точки «Спина», «Пояс», «Рука» используются для расчёта перехода. Один GLB-узел не может менять родительскую кость во время анимации, поэтому программа записывает движение самого оружия.</p>
+      </div>
+      <div class="studio-help-topic" data-help-section="issues" hidden>
+        <h3>Если оружие не сохраняется или движется странно</h3>
+        <ul class="studio-help-troubleshoot">
+          <li><b>«Ключ на этом кадре» неактивен.</b> Проверь, что загружены персонаж и оружие, выбрана анимация и меч прикреплён к кости через «Привязать».</li>
+          <li><b>Меч прыгает при переключении клипов.</b> Убедись, что выставлена отдельная позиция и нажата «Запомнить положение». Не используй только мировые координаты из JSON как положение относительно кисти.</li>
+          <li><b>Меч неверно стоит на спине/поясе.</b> Автоматическая кнопка выбирает кость позвоночника или таза, а не реальные ножны; вручную выставь позицию и поворот, затем запиши ключ.</li>
+          <li><b>Меч следует руке вместо спины.</b> Во вкладке «Достать меч» запиши первый ключ относительно «Спина», второй относительно «Рука», а не одну статическую позицию.</li>
+          <li><b>Меч держится, но рука не тянется к нему.</b> Приложение редактирует оружие и ограниченные поправки суставов, но не создаёт IK-анимацию доставания автоматически. Нужна подходящая анимация персонажа.</li>
+          <li><b>После GLB всё не так.</b> Сохрани файл под новым именем, загрузи его обратно, переключай Idle/Attack/DrawWeapon. Если видишь ошибку экспорта или пропали ключи, пришли видео с выбором клипа и шкалой.</li>
+        </ul>
+        <p class="studio-help-note">Проверка в приложении (текущий проект): <span id="studio-help-status">Загрузка сведений…</span></p>
+      </div>
+    </div>
+    <footer class="studio-help-footer">
+      <button type="button" class="btn subtle" id="studio-help-prev">← Назад</button>
+      <span id="studio-help-page">1 / 4</span>
+      <button type="button" class="btn primary" id="studio-help-next">Далее →</button>
+    </footer>
+  </div>
+</div>
 <input id="file-character" type="file" accept=".glb,.gltf,.fbx,.obj,.dae,.stl,.ply,.bin,.png,.jpg,.jpeg,.webp,.tga,.bmp,.mtl" multiple hidden/>
 <input id="file-weapon" type="file" accept=".glb,.gltf,.fbx,.obj,.dae,.stl,.ply,.bin,.png,.jpg,.jpeg,.webp,.tga,.bmp,.mtl" multiple hidden/>
 </div>
