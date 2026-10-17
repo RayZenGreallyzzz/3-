@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "test:pose": "node --test tests/arm-pose.test.mjs",
+    "test:pose": "node --test tests/*.test.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "android": "npm run build && npx cap sync android"
   },
