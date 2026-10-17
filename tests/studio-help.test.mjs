@@ -21,7 +21,7 @@ test('each help tab has a real topic and describes practical workflow',()=>{
   assert.ok(html.includes('data-help-section="'+key+'"'),key+' content');
  }
  for(const term of ['Запомнить положение','Ключ на этом кадре','Спина','Пояс',
-  '0.70','экспорт','Нужна','две','Рука']){
+  '0.70','экспорт','Нужна','два ключа','Рука']){
   assert.ok(html.toLowerCase().includes(term.toLowerCase()),term);
  }
 });
