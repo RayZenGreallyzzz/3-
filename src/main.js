@@ -976,8 +976,8 @@ function animate(){
     armPose.restore();
     state.mixer.update(delta);
     armPose.apply();
-    applyCurrentWeapon();
     state.time=state.action.time;
+    applyCurrentWeapon();
     displayAcc += delta;
     if(displayAcc>=.06) {refreshAnimationTime();refreshExport();displayAcc=0;}
   } else if(state.weapon?.parent?.isBone) {
