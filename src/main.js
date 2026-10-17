@@ -681,13 +681,23 @@ button('pose-reset-arm', () => {
 button('reset-weapon',()=> {
   if(!state.weapon)return toast('Сначала загрузи оружие');
   state.weapon.position.set(0,0,0);state.weapon.rotation.set(0,0,0);state.weapon.scale.set(1,1,1);
-  refreshFields();refreshExport();
+    markWeaponDirty();refreshFields();refreshExport();
 });
 $('bone-search').addEventListener('input',renderBones);
 $('animation-select').addEventListener('change',event=>selectClip(Number(event.target.value)));
 button('animation-play',playPause);
 button('animation-stop',stopAnimation);
 button('animation-start',()=> {stopAnimation();});
+button('save-weapon-clip',()=>{
+ if(!commitWeapon())return toast('Сначала привяжи оружие к кости и выбери анимацию.');
+ toast('✓ Положение оружия сохранено для «'+state.clip.name+'»');
+});
+button('reset-weapon-clip',()=>{
+ const i=currentClipIndex();if(i<0||!state.weapon?.parent?.isBone)return;
+ weaponProfiles.reset(i,state.weapon);weaponDirty=false;
+ refreshFields();refreshExport();refreshWeaponPresetUI();
+ toast('Исходная позиция восстановлена только для этого действия');
+});
 $('animation-speed').addEventListener('change',()=> {if(state.action)state.action.timeScale=Number($('animation-speed').value);});
 $('animation-seek').addEventListener('input',event=> {if (state.clip)setTime(state.clip.duration*(Number(event.target.value)/1000));});
 for (const modeButton of document.querySelectorAll('[data-mode]')) {
@@ -802,6 +812,7 @@ function showExportStatus(message) {
 async function exportSceneGLB() {
   if (state.exporting) return;
   if (!state.character && !state.weapon) return toast('Сначала загрузи персонажа или оружие');
+  if(weaponDirty)commitWeapon();rememberArms();
   state.exporting = true;
   const btn = $('export-glb');
   btn.disabled = true;
@@ -815,7 +826,7 @@ async function exportSceneGLB() {
   const exportWeapon = state.weapon;
   // glTF extras survive reload. They identify the weapon separately from
   // the character so it can be edited again in another Rig & Weapon session.
-  if (exportWeapon) exportWeapon.userData.rigWeaponStudioRole = 'weapon';
+  if (exportWeapon){exportWeapon.userData.rigWeaponStudioRole = 'weapon';exportWeapon.userData.rigWeaponStudioWeaponProfiles=weaponProfiles.toJSON();}
   const detachedWeapon = exportWeapon && (!exportCharacter || !exportCharacter.getObjectById(exportWeapon.id));
   const playingBeforeSave = state.playing;
   if (state.action) state.action.paused = true;
@@ -835,8 +846,9 @@ async function exportSceneGLB() {
     objectsInExportScene = true;
     exportScene.updateMatrixWorld(true);
     const exporter = new GLTFExporter();
-    const processed = bakePoseClips(state.clips, armPose.offsets);
-    const animationsForExport = exportCharacter ? processed.clips : [];
+    const processed=bakePoseClipsByIndex(state.clips,armCorrections);
+    const weaponClips=bakeWeaponAnimationClips(processed.clips,exportWeapon,weaponProfiles);
+    const animationsForExport=exportCharacter?weaponClips.clips:[];
     let result;
     let missingAnimations = false;
     try {
@@ -943,6 +955,7 @@ function animate(){
     armPose.restore();
     state.mixer.update(delta);
     armPose.apply();
+    if(!weaponDirty)weaponProfiles.apply(currentClipIndex(),state.weapon);
     state.time=state.action.time;
     displayAcc += delta;
     if(displayAcc>=.06) {refreshAnimationTime();refreshExport();displayAcc=0;}
