@@ -15,6 +15,7 @@ import {WeaponAnimationProfiles,bakeWeaponAnimationClips} from './weapon-profile
 import {bakeWeaponMotionClips} from './weapon-motion.js';
 import {WeaponMotionEditor} from './weapon-motion-editor.js';
 import {assertSavedWeaponMotion} from './weapon-export-verify.js';
+import {setupStudioHelp} from './studio-help.js';
 import './style.css';
 
 const NativeFileSaver = registerPlugin('NativeFileSaver');
@@ -627,7 +628,8 @@ splash.innerHTML=`
     <div class="start-art-wrap"><img class="start-art" src="/panda-menu.webp" alt="Неоновый талисман приложения — сердитый зверёк в кепке"/></div>
     <div class="start-buttons"><button class="btn primary" id="start-character"><span class="btn-ico">◈</span> Загрузить персонажа <span>→</span></button>
     <button class="btn subtle" id="start-weapon"><span class="btn-ico">⚔</span> Загрузить оружие <span>→</span></button>
-    <button class="btn subtle" id="start-demo"><span class="btn-ico">◉</span> Открыть пустую сцену <span>→</span></button></div>
+    <button class="btn subtle" id="start-demo"><span class="btn-ico">◉</span> Открыть пустую сцену <span>→</span></button>
+    <button class="btn subtle" type="button" id="start-help"><span class="btn-ico">❔</span> Пошаговая инструкция <span>→</span></button></div>
     <div class="start-divider">РЕДАКТОР ПОДДЕРЖИВАЕТ</div>
     <div class="start-features"><span>GLB · GLTF · FBX</span><span>OBJ · DAE · STL · PLY</span><span>Скелет и анимации</span></div>
     <div class="start-bottom">PERSONAL 3D EDITOR · ANDROID & DESKTOP</div>
@@ -995,3 +997,17 @@ animate();
 refreshFields();refreshExport();
 refreshModelActions();
 refreshPoseUI();
+setupStudioHelp({
+ getStatus:()=>[
+  state.character?'✓ Персонаж загружен':'○ Персонаж не загружен',
+  state.bones.length?'✓ Скелет: '+state.bones.length+' костей':'○ Нет костей',
+  state.weapon?'✓ Оружие загружено':'○ Нет оружия',
+  state.weapon?.parent?.isBone?'✓ Оружие привязано к '+state.weapon.parent.name:'○ Оружие не привязано к кости',
+  state.clip?'✓ Анимация: '+state.clip.name:'○ Анимация не выбрана'
+ ].join(' · '),
+ onNavigate:()=>{
+  // Visiting a control from the splash opens the existing editor only.
+  // No model, animation key, or weapon transform is modified.
+  showEditor();
+ }
+});
