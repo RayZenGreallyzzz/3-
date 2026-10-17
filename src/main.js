@@ -14,6 +14,7 @@ import { ArmPoseController, POSE_LIMITS, POSE_LABELS, resolveArmBones, identifyA
 import {WeaponAnimationProfiles,bakeWeaponAnimationClips} from './weapon-profiles.js';
 import {bakeWeaponMotionClips} from './weapon-motion.js';
 import {WeaponMotionEditor} from './weapon-motion-editor.js';
+import {assertSavedWeaponMotion} from './weapon-export-verify.js';
 import './style.css';
 
 const NativeFileSaver = registerPlugin('NativeFileSaver');
@@ -318,7 +319,7 @@ function renderBones() {
     const name = document.createElement('span'); name.textContent = bone.name || '(без имени)';
     const index = document.createElement('small'); index.textContent = '#'+(state.bones.indexOf(bone)+1);
     row.append(name,index);
-    row.addEventListener('click', () => { state.selectedBone = bone; renderBones(); toast('Кость выбрана: '+bone.name); });
+    row.addEventListener('click', () => { state.selectedBone = bone; renderBones(); weaponMotionEditor.render(); toast('Кость выбрана: '+bone.name); });
     list.append(row);
   });
 }
@@ -878,9 +879,10 @@ async function exportSceneGLB() {
         animations: animationsForExport
       });
     } catch (animationError) {
-      // Some FBX animation tracks cannot be represented by glTF.
-      // Still allow export of the character with its attached weapon,
-      // but warn clearly that its animations were not included.
+      // Never pretend to save weapon motion when the GLB exporter dropped
+      // action tracks. The user needs ALL weapon positions per animation.
+      if (exportWeapon?.parent?.isBone && state.clips.length)
+        throw new Error('GLB не смог записать анимации оружия: '+(animationError?.message||String(animationError)));
       if (!state.clips.length) throw animationError;
       console.warn('Animation export failed, retry without clips:', animationError);
       result = await new GLTFExporter().parseAsync(exportScene, {
@@ -890,6 +892,9 @@ async function exportSceneGLB() {
     }
     restoreExportScene();
     const gltf = verifyGlbBuffer(result);
+    assertSavedWeaponMotion(gltf,missingAnimations?0:animationsForExport.length,{
+      weaponExpected:Boolean(exportWeapon?.parent?.isBone&&!missingAnimations)
+    });
     const nodes = gltf.nodes || [];
     if (exportCharacter && !nodes.some(n => n.name === exportCharacter.name))
       console.warn('Character root group not named in export; model nodes:', nodes.length);
